@@ -1,6 +1,6 @@
 {
   "name": "zapit",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Zero-login drag & drop file transfer between devices via web/LAN, with optional Authentik SSO and admin kill-switch",
   "main": "server.js",
   "directories": {
