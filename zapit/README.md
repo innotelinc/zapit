@@ -1,5 +1,7 @@
 # ⚡ zapit
 
+<img src="docs/logo.svg" alt="ZAPIT — golden lightning bolt" width="420" />
+
 Zap files between your devices in real time — drag & drop, no accounts, no uploads to disk.
 Open the same URL on both devices (or scan the QR), type the same room code, drop files. Done.
 
