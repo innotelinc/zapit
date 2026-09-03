@@ -264,11 +264,11 @@ const rowNamed = (w, name) => rows(w).find((r) => r.querySelector('.name').textC
     const dataStart = lhStart + 30 + nameLen;
     ok('zip entry payload intact', zipBuf.subarray(dataStart, dataStart + dataSize).equals(Buffer.from('file number one')));
 
-    console.log('▶ text zap (A → B)');
+    console.log('▶ zing zap (A → B)');
     A.w.document.getElementById('txtOut').value = 'sim says hi';
     A.w.document.getElementById('sendTxt').click();
     await waitFor(() => B.w.document.getElementById('txtIn').value === 'sim says hi', 5000, 'text arrived');
-    ok('text zap delivered', true);
+    ok('zing zap delivered', true);
 
     console.log('▶ relay fallback (RTC disabled → through server)');
     A.w.__forceRelay = true;
