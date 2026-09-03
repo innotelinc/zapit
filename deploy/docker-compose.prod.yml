@@ -46,7 +46,7 @@
 
 services:
   zapit:
-    image: ghcr.io/innotelinc/zapit:latest
+    image: ghcr.io/innotelinc/zapit:1.2.1
     container_name: zapit
     restart: unless-stopped
     ports:
