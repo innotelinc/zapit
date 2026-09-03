@@ -1,6 +1,0 @@
-# droppy.innotel.us — automatic HTTPS via Let's Encrypt.
-# WebSocket upgrades are proxied automatically; no extra config needed.
-droppy.innotel.us {
-	encode zstd gzip
-	reverse_proxy droppy:5150
-}
