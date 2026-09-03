@@ -8,5 +8,5 @@ data/
 # unrelated toolchain downloads
 go1.*.tar.gz*
 
-# unrelated local project (not part of droppy) — remove this line to track it
+# unrelated local project — remove this line to track it
 compose/

@@ -23,6 +23,13 @@ services:
       # (defaults to the canonical/LAN URL)
       QR_URL: "${QR_URL:-}"
       AUTH_ENABLED: "${AUTH_ENABLED:-false}"
+      # SecretOps (docs/stack.md): ADMIN_PASSWORD / AUTHENTIK_CLIENT_SECRET
+      # may be infisical://<name> references resolved at startup; plain
+      # values are mirrored into Infisical on boot.
+      INFISICAL_ADDR: "${INFISICAL_ADDR:-}"
+      INFISICAL_TOKEN: "${INFISICAL_TOKEN:-}"
+      INFISICAL_WORKSPACE_ID: "${INFISICAL_WORKSPACE_ID:-}"
+      INFISICAL_ENVIRONMENT: "${INFISICAL_ENVIRONMENT:-prod}"
     volumes:
       # named volume: owned by the container's node user automatically.
       # Prefer a bind mount instead? Use ./data:/data and run: chown 1000:1000 ./data

@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "test": "node test/smoke.js && node test/browser-sim.js",
+    "test": "node --test test/infisical.test.js && node test/smoke.js && node test/browser-sim.js",
     "start": "node server.js",
     "test:unit": "node test/smoke.js",
     "test:ui": "node test/browser-sim.js"
