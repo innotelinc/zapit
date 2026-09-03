@@ -22,7 +22,7 @@ provides, and explicitly does not own.
 
 ## Provides
 
-- **Transfer service to users** — `zapit.innotel.us` public instance and
+- **Transfer service to users** — `zapp.innotel.us` public instance and
   self-hosted deploys, via the zapit portal
 - **Optional Authentik blueprint** — one-click SSO provider YAML
   (`/api/authentik/blueprint` or `zapit/authentik/blueprint.yaml`)
