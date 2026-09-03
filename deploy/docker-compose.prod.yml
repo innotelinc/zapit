@@ -1,39 +1,44 @@
 # Production deployment for https://zapit.innotel.us
-# Reverse proxy: Nginx Proxy Manager (NPM) — this compose does NOT publish ports
-# or terminate TLS; your existing NPM instance owns 80/443.
 #
-# 1. Copy .env.example to .env next to this file and set at minimum:
+# Topology (matches the live setup):
+#   * zapit runs on its OWN host (the "app host", e.g. the nas at 192.168.1.10)
+#     and PUBLISHES port 5150 on that host's LAN address.
+#   * Nginx Proxy Manager (NPM) runs on a DIFFERENT host (e.g. 192.168.1.71),
+#     owns ports 80/443 + TLS, and proxies zapit.innotel.us over the LAN to
+#     <app-host>:5150. No shared docker network — the boxes are separate.
+#
+# 1. On the APP host: copy .env.example to .env next to this file and set:
 #      ADMIN_PASSWORD=<secret>
-#      AUTHENTIK_BASE_URL=https://<your-authentik-host>
-#      AUTHENTIK_CLIENT_ID=zapit
-#      NPM_NETWORK=<the docker network your NPM container uses>  (see below)
+#      (Authentik vars only if you use SSO — see README)
 #
-#    Find the network:  docker inspect <npm-container> --format '{{range $k,$_ := .NetworkSettings.Networks}}{{$k}} {{end}}'
-#    (commonly "npm_default" or a manually created "proxy" network)
+# 2. DNS: zapit.innotel.us must resolve to the NPM host (wildcard *.innotel.us
+#    already covers it in the innotel setup).
 #
-# 2. Point DNS for zapit.innotel.us at the host running NPM.
-#
-# 3. Bring it up:
+# 3. On the APP host, bring it up:
 #      docker compose -f docker-compose.prod.yml up -d
 #
-# 4. In NPM: Hosts → Proxy Hosts → Add Proxy Host
+# 4. On the NPM host (UI at http://<npm-host>:81) add a proxy host:
 #      Domain:        zapit.innotel.us
 #      Scheme:        http
-#      Forward Host:  zapit       (this compose's container name)
-#      Port:          5150
+#      Forward Host:  <app-host LAN IP>   (e.g. 192.168.1.10 — NOT a container name)
+#      Forward Port:  5150
 #      ✅ Websockets Support        (required — transfers ride WebSockets)
 #      ✅ Block Common Exploits
-#      SSL tab: Request a new Let's Encrypt certificate, Force SSL, HTTP/2
+#      SSL tab: Request a new Let's Encrypt certificate · Force SSL · HTTP/2
+#    Or via the NPM API: POST /api/nginx/proxy-hosts with the same fields.
 #
-# 5. Apply the Authentik blueprint once: open https://zapit.innotel.us/admin →
-#    "Download blueprint YAML" → paste into Authentik (Customize → Blueprints → Create),
-#    or mount authentik/blueprint.yaml into the authentik worker as /blueprints/zapit.yaml.
-#    client_id must match AUTHENTIK_CLIENT_ID (blueprint default: zapit).
+# 5. Apply the Authentik blueprint once (only if you use SSO): open
+#    https://zapit.innotel.us/admin → "Download blueprint YAML" → paste into
+#    Authentik (Customize → Blueprints → Create), or mount
+#    zapit/authentik/blueprint.yaml into the authentik worker as
+#    /blueprints/zapit.yaml. client_id must match AUTHENTIK_CLIENT_ID
+#    (blueprint default: zapit).
 #
 # 6. Flip "Require Authentik login" in /admin when ready.
 #
 # QR code customization: set QR_URL in .env to change the link address the QR
-# code encodes (defaults to PUBLIC_URL, or the LAN URL when unset).
+# code encodes (defaults to PUBLIC_URL, or the LAN URL when unset). The live
+# deployment uses QR_URL=https://zapit.innotel.us/?room=zap-421.
 #
 # Note: pulling ghcr.io/innotelinc/zapit requires the GHCR package to be public
 # (repo → Packages → zapit → Package settings) or a `docker login ghcr.io` with a
@@ -44,6 +49,9 @@ services:
     image: ghcr.io/innotelinc/zapit:latest
     container_name: zapit
     restart: unless-stopped
+    ports:
+      # published on the app host's LAN address so the remote NPM can reach it
+      - "5150:5150"
     environment:
       PORT: "5150"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}"
@@ -58,21 +66,11 @@ services:
       AUTH_ENABLED: "${AUTH_ENABLED:-false}"
     volumes:
       - zapit-data:/data
-    networks:
-      - npm-proxy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5150/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
-    # Direct LAN access without going through NPM? Uncomment:
-    # ports:
-    #   - "5150:5150"
-
-networks:
-  npm-proxy:
-    external: true
-    name: "${NPM_NETWORK:?set NPM_NETWORK in .env}"
 
 volumes:
   zapit-data:
