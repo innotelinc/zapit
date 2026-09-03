@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Droppy smoke test — boots the server on an ephemeral port and exercises:
+ * ZapIt smoke test — boots the server on an ephemeral port and exercises:
  *   - static pages + JSON endpoints
  *   - two clients joining a room and exchanging presence
  *   - a real binary file streamed through the relay (chunked) to the other peer
@@ -103,18 +103,18 @@ function wsClient() {
 }
 
 async function main() {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'droppy-test-'));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zapit-test-'));
   const server = spawn(process.execPath, [path.join(ROOT, 'server.js')], {
     env: {
       ...process.env,
       PORT: String(PORT),
       HOST: '127.0.0.1',
-      DROPPY_DATA_DIR: dataDir,
+      ZAPIT_DATA_DIR: dataDir,
       ADMIN_PASSWORD: 'test-admin-pw',
-      PUBLIC_URL: 'https://droppy.example.test',
+      PUBLIC_URL: 'https://zapit.example.test',
       // fake provider config: only needs to exist so the auth toggle is permitted
       AUTHENTIK_BASE_URL: 'http://127.0.0.1:9',
-      AUTHENTIK_CLIENT_ID: 'droppy-test-client',
+      AUTHENTIK_CLIENT_ID: 'zapit-test-client',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -130,7 +130,7 @@ async function main() {
 
     console.log('▶ static & api');
     const idx = await get('/');
-    ok('GET / serves index', idx.status === 200 && idx.body.includes('droppy'));
+    ok('GET / serves index', idx.status === 200 && idx.body.includes('zapit'));
     const admin = await get('/admin');
     ok('GET /admin serves admin page', admin.status === 200 && admin.body.includes('admin'));
     const cfg = await get('/api/config');
@@ -138,7 +138,8 @@ async function main() {
     const lan = await get('/api/lan');
     const lanJ = JSON.parse(lan.body);
     ok('GET /api/lan includes QR data URL', lan.status === 200 && lanJ.qr.startsWith('data:image/png;base64,'));
-    ok('/api/lan uses PUBLIC_URL for QR/self', lanJ.selfUrl === 'https://droppy.example.test' && lanJ.addresses[0].url === 'https://droppy.example.test');
+    ok('/api/lan uses PUBLIC_URL for QR/self', lanJ.selfUrl === 'https://zapit.example.test' && lanJ.addresses[0].url === 'https://zapit.example.test');
+    ok('/api/lan QR encodes PUBLIC_URL by default', lanJ.qrUrl === 'https://zapit.example.test');
 
     console.log('▶ authentik blueprint generator');
     const bpRes = await get('/api/authentik/blueprint');
@@ -156,15 +157,39 @@ async function main() {
       bp.entries[0].model === 'authentik_providers_oauth2.oauth2provider' &&
       bp.entries[1].model === 'authentik_core.application');
     ok('blueprint provider is public/PKCE client with expected client_id',
-      bp && bp.entries[0].attrs.client_type === 'public' && bp.entries[0].attrs.client_id === 'droppy-test-client');
+      bp && bp.entries[0].attrs.client_type === 'public' && bp.entries[0].attrs.client_id === 'zapit-test-client');
     ok('blueprint redirect URI derives from PUBLIC_URL',
-      bp && bp.entries[0].attrs.redirect_uris[0].url === 'https://droppy.example.test/api/auth/callback');
+      bp && bp.entries[0].attrs.redirect_uris[0].url === 'https://zapit.example.test/api/auth/callback');
     ok('blueprint links application via !KeyOf',
-      bp && bp.entries[1].attrs.provider === 'droppy-provider' && bp.entries[0].id === 'droppy-provider');
+      bp && bp.entries[1].attrs.provider === 'zapit-provider' && bp.entries[0].id === 'zapit-provider');
+
+    console.log('▶ QR_URL override (custom QR link address)');
+    // third server run: QR_URL set → QR must encode it, everything else unchanged
+    try {
+      const server3 = spawn(process.execPath, [path.join(ROOT, 'server.js')], {
+        env: {
+          ...process.env,
+          PORT: String(PORT + 2),
+          HOST: '127.0.0.1',
+          ZAPIT_DATA_DIR: dataDir,
+          ADMIN_PASSWORD: 'x',
+          PUBLIC_URL: 'https://zapit.example.test',
+          QR_URL: 'https://join.example.org/pick-a-room',
+        },
+        stdio: 'ignore',
+      });
+      let up3 = false;
+      for (let i = 0; i < 50; i++) { try { await get2(PORT + 2, '/healthz'); up3 = true; break; } catch { await sleep(100); } }
+      const lan3 = JSON.parse((await get2(PORT + 2, '/api/lan')).body);
+      ok('QR_URL overrides the encoded address', up3 && lan3.qrUrl === 'https://join.example.org/pick-a-room');
+      ok('QR_URL leaves selfUrl/addresses alone', up3 && lan3.selfUrl === 'https://zapit.example.test' && lan3.addresses[0].url === 'https://zapit.example.test');
+      ok('QR image still a PNG data URL', up3 && lan3.qr.startsWith('data:image/png;base64,'));
+      server3.kill('SIGTERM');
+    } catch (e) { ok('QR_URL override works', false, e.message); }
     try {
       // second server run: no PUBLIC_URL → endpoint must refuse
       const server2 = spawn(process.execPath, [path.join(ROOT, 'server.js')], {
-        env: { ...process.env, PORT: String(PORT + 1), HOST: '127.0.0.1', DROPPY_DATA_DIR: dataDir, ADMIN_PASSWORD: 'x' },
+        env: { ...process.env, PORT: String(PORT + 1), HOST: '127.0.0.1', ZAPIT_DATA_DIR: dataDir, ADMIN_PASSWORD: 'x' },
         stdio: 'ignore',
       });
       let up = false;

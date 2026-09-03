@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0d10" />
-<title>Droppy · zap files between devices</title>
+<title>ZapIt · zap files between devices</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚡%3C/text%3E%3C/svg%3E" />
 <style>
   :root {
@@ -130,7 +130,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo"><span class="bolt">⚡</span> droppy</div>
+    <div class="logo"><span class="bolt">⚡</span> zapit</div>
     <div id="authBadge" class="badge hidden"></div>
   </header>
 
@@ -186,7 +186,7 @@
     </div>
   </div>
 
-  <footer>droppy · <span id="modeTag" title="p2p = direct, relay = via server">mode: —</span> · <a href="/admin" id="adminLink">admin</a></footer>
+  <footer>zapit · <span id="modeTag" title="p2p = direct, relay = via server">mode: —</span> · <a href="/admin" id="adminLink">admin</a></footer>
 </div>
 
 <div class="modal" id="modal"><img id="modalImg" alt="QR code enlarged" /></div>
@@ -199,7 +199,7 @@
   const roomEl = $('room'), statusText = $('statusText'), dot = $('dot');
   const drop = $('drop'), fileInput = $('file'), dirInput = $('dir'), transfersEl = $('transfers');
 
-  const IS_SIM = typeof window !== 'undefined' && window.droppySim === true;
+  const IS_SIM = typeof window !== 'undefined' && window.zapitSim === true;
   const WS_CHUNK = IS_SIM ? 64 * 1024 : 256 * 1024; // bytes per relayed chunk
   const DC_CHUNK  = IS_SIM ? 64 * 1024 : 16 * 1024; // bytes per WebRTC message
   const DC_BUF_MAX = 4 * 1024 * 1024;               // dc.bufferedAmount high-water mark
@@ -238,7 +238,7 @@
       disconnectWS();
       const fresh = randomCode();
       roomEl.value = fresh;
-      localStorage.setItem('droppy_room', fresh);
+      localStorage.setItem('zapit_room', fresh);
       toast(`Room ${old} expired — new code: ${fresh}`);
       connect();
     },
@@ -276,13 +276,13 @@
   };
   const setStatus = (text, cls) => { statusText.textContent = text; dot.className = 'dot' + (cls ? ' ' + cls : ''); };
   const deviceName = () => {
-    let n = localStorage.getItem('droppy_name');
+    let n = localStorage.getItem('zapit_name');
     if (!n) {
       const ua = navigator.userAgent;
       const kind = /iPhone|iPad|iPod/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows PC' : /Linux/.test(ua) ? 'Linux' : 'Device';
       const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
       n = `${kind} · ${browser}`;
-      localStorage.setItem('droppy_name', n);
+      localStorage.setItem('zapit_name', n);
     }
     return n;
   };
@@ -385,7 +385,7 @@
     if (!peerIds.length) { toast('No paired devices yet'); return; }
     const tid = ++transferSeq;
     const multi = files.length > 1;
-    const base = multi ? `droppy-${tid}.zip` : files[0].name;
+    const base = multi ? `zapit-${tid}.zip` : files[0].name;
     const totalSize = files.reduce((s, f) => s + f.size, 0);
     const row = addRow(base, totalSize, '↑ negotiating');
     sendRows[tid] = row;
@@ -542,7 +542,7 @@
 
   $('saveAllBtn').onclick = async () => {
     const zip = await buildZip(readyFiles.map((f) => ({ name: f.name, blob: f.blob })));
-    saveBlob(zip, `droppy-received-${Date.now()}.zip`);
+    saveBlob(zip, `zapit-received-${Date.now()}.zip`);
   };
 
   /* ============ transfer rows ============ */
@@ -573,7 +573,7 @@
     const r = roomEl.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 24);
     if (!r) { setStatus('Enter a room code first.', 'wait'); roomEl.focus(); return; }
     room.name = r;
-    localStorage.setItem('droppy_room', r);
+    localStorage.setItem('zapit_room', r);
 
     disconnectWS();
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -723,7 +723,7 @@
     if (window.__forceRelay) return; // test/escape hatch: stay on relay
     const p = makePeer(toId);
     if (p.dc && p.dc.readyState === 'open') return; // already connected
-    const dc = p.pc.createDataChannel('droppy', { ordered: true });
+    const dc = p.pc.createDataChannel('zapit', { ordered: true });
     tagDC(dc, Number(toId));
     attachChannel(p, dc);
     const offer = await p.pc.createOffer();
@@ -778,13 +778,16 @@
     try {
       const lan = await fetch('/api/lan').then((r) => r.json());
       $('qr').src = lan.qr;
-      $('lanUrl').textContent = lan.addresses.length ? lan.addresses[0].url : lan.selfUrl;
+      const qrAddr = lan.qrUrl || (lan.addresses.length ? lan.addresses[0].url : lan.selfUrl);
+      $('lanUrl').textContent = qrAddr;
+      $('qr').title = `Scan to open ${qrAddr}`;
+      $('qr').alt = `QR code encoding ${qrAddr}`;
     } catch {}
     $('qr').onclick = () => { $('modalImg').src = $('qr').src; $('modal').classList.add('show'); };
     $('modal').onclick = () => $('modal').classList.remove('show');
 
     const urlRoom = new URLSearchParams(location.search).get('room');
-    const saved = localStorage.getItem('droppy_room');
+    const saved = localStorage.getItem('zapit_room');
     if (urlRoom) roomEl.value = urlRoom;
     else if (saved) roomEl.value = saved;
     if (roomEl.value) connect();
@@ -793,7 +796,7 @@
   boot();
 
   // test hooks (no-ops in real usage)
-  window.__droppySend = sendDropped;
+  window.__zapitSend = sendDropped;
 })();
 </script>
 </body>

@@ -1,4 +1,4 @@
-# ⚡ droppy
+# ⚡ zapit
 
 Zap files between your devices in real time — drag & drop, no accounts, no uploads to disk.
 Open the same URL on both devices (or scan the QR), type the same room code, drop files. Done.
@@ -9,7 +9,7 @@ Open the same URL on both devices (or scan the QR), type the same room code, dro
 - **Multi-file & folder drops arrive as one ZIP** (built in-browser, store method, zero deps)
 - **Room codes auto-expire** — 15 min after pairing (paused while devices are connected),
   the code rotates automatically; rotate manually anytime with **↻ New code**
-- **QR code** of your LAN address so phones can join in one scan
+- **Customizable QR code** — point the QR at any link address with `QR_URL`
 - **Text snippets** shared alongside files
 - **Optional Authentik SSO** (OIDC + PKCE) with a **flip of a switch** in the admin panel
 - **Admin password** required to flip that switch (and to lock the panel)
@@ -31,7 +31,7 @@ same room code, and drop files both ways.
 Devices join a **room** (an ephemeral ID you invent, e.g. `zap-421`). On pairing, the devices
 negotiate a **WebRTC data channel** (STUN-assisted, one file at a time per peer) — transfers
 then flow directly device-to-device and never touch the server. If the negotiation fails
-(strict NATs, blocked UDP), droppy silently falls back to relaying chunks through the server
+(strict NATs, blocked UDP), zapit silently falls back to relaying chunks through the server
 over the same WebSocket, so transfers always work. The footer shows the active mode:
 `mode: p2p` or `mode: relay`.
 
@@ -46,6 +46,21 @@ Room codes are capabilities, so they expire: **15 minutes** after pairing (or la
 The countdown shows next to the room field and **pauses while other devices are paired** —
 an active session never gets yanked mid-transfer. When idle, the code auto-rotates and the
 new code is shown; share it again. Prefer manual control? **↻ New code** rotates on demand.
+
+## QR code customization
+
+The QR code on the page encodes the address phones should open. By default that's the
+canonical URL (`PUBLIC_URL` when set, otherwise the LAN URL). Point it anywhere else with
+the `QR_URL` env var — handy for vanity domains, alternate proxy entries, or a pre-filled
+join link:
+
+```bash
+QR_URL=https://join.example.org/room zapit npm start
+# or in docker-compose: QR_URL=https://join.example.org/room
+```
+
+The caption under the QR and its tooltip follow the encoded address. Everything else
+(`PUBLIC_URL`, LAN listing, OIDC redirect URI) is unaffected.
 
 ## Admin & the auth kill-switch
 
@@ -68,36 +83,37 @@ when Authentik isn't configured is rejected (that would lock everyone out).
 
 ### One-click blueprint (recommended)
 
-droppy can generate a ready-made **authentik blueprint** that creates the OAuth2 provider
+zapit can generate a ready-made **authentik blueprint** that creates the OAuth2 provider
 and application for you — no manual provider clicking:
 
-1. Set `PUBLIC_URL=https://droppy.innotel.us` (and `AUTHENTIK_CLIENT_ID`) on droppy, then
+1. Set `PUBLIC_URL=https://zapit.innotel.us` (and `AUTHENTIK_CLIENT_ID`) on zapit, then
    open `/admin` → **⬇ Download blueprint YAML** (or `GET /api/authentik/blueprint`).
 2. Import it into Authentik either way:
    - **UI:** *Customize → Blueprints → Create* and paste the YAML, or
-   - **GitOps:** mount it into the authentik container as `/blueprints/droppy.yaml`
+   - **GitOps:** mount it into the authentik container as `/blueprints/zapit.yaml`
      (a static copy with extra redirect URIs lives in [`authentik/blueprint.yaml`](authentik/blueprint.yaml)).
-3. Make sure droppy's `AUTHENTIK_CLIENT_ID` matches the blueprint's `client_id`
-   (`DROPPY_CLIENT_ID` env on authentik, default `droppy`), then flip the switch in `/admin`.
+3. Make sure zapit's `AUTHENTIK_CLIENT_ID` matches the blueprint's `client_id`
+   (`ZAPIT_CLIENT_ID` env on authentik, default `zapit`), then flip the switch in `/admin`.
 
 The blueprint wires the provider as a **public PKCE client** (no secret), attaches the
 standard `openid`/`profile`/`email` scope mappings, and whitelists
-`https://droppy.innotel.us/api/auth/callback` as the redirect URI.
+`https://zapit.innotel.us/api/auth/callback` as the redirect URI.
 
 ### Manual setup
 
 1. In Authentik: **Applications → Providers → Create** an *OAuth2/OpenID Connect* provider.
-2. Set the **redirect URI** to `https://your-droppy-host/api/auth/callback`
+2. Set the **redirect URI** to `https://your-zapit-host/api/auth/callback`
    (use `http://...:5150/api/auth/callback` for plain LAN).
 3. Choose **public** client (PKCE — no secret needed) or confidential (paste the secret).
-4. Configure droppy via env (or `data/config.json`):
+4. Configure zapit via env (or `data/config.json`):
 
    ```bash
    AUTHENTIK_BASE_URL=https://authentik.example.com
    AUTHENTIK_CLIENT_ID=your_client_id
    # AUTHENTIK_CLIENT_SECRET=...        # only for confidential clients
-   # AUTHENTIK_SLUG=droppy              # provider/application slug, default: droppy
-   # PUBLIC_URL=https://droppy.innotel.us  # canonical public origin (QR + redirect URI)
+   # AUTHENTIK_SLUG=zapit               # provider/application slug, default: zapit
+   # PUBLIC_URL=https://zapit.innotel.us  # canonical public origin (QR + redirect URI)
+   # QR_URL=https://join.example.org    # optional: custom link address for the QR code
    ```
 
 5. Restart, flip the switch in `/admin`. A "Sign in with Authentik" button appears in the UI,
@@ -111,13 +127,14 @@ standard `openid`/`profile`/`email` scope mappings, and whitelists
 | `HOST` | `0.0.0.0` | Bind address |
 | `ADMIN_PASSWORD` | *(unset)* | Enables the admin API + panel |
 | `AUTHENTIK_BASE_URL` | *(unset)* | e.g. `https://authentik.example.com` |
-| `AUTHENTIK_SLUG` | `droppy` | Provider application slug |
+| `AUTHENTIK_SLUG` | `zapit` | Provider application slug |
 | `AUTHENTIK_CLIENT_ID` | *(unset)* | OIDC client id |
 | `AUTHENTIK_CLIENT_SECRET` | *(empty)* | Only for confidential clients |
 | `AUTHENTIK_SCOPES` | `openid profile email` | Requested scopes |
-| `PUBLIC_URL` | *(unset)* | Canonical public origin (e.g. `https://droppy.innotel.us`) — overrides QR/LAN URLs and pins the OIDC redirect URI |
+| `PUBLIC_URL` | *(unset)* | Canonical public origin (e.g. `https://zapit.innotel.us`) — overrides QR/LAN URLs and pins the OIDC redirect URI |
+| `QR_URL` | *(unset)* | **QR customization** — link address the QR code encodes (defaults to `PUBLIC_URL` or the LAN URL) |
 | `AUTH_ENABLED` | `false` | Initial kill-switch state (persisted afterwards) |
-| `DROPPY_DATA_DIR` | `./data` | Where `state.json` / `config.json` live |
+| `ZAPIT_DATA_DIR` | `./data` | Where `state.json` / `config.json` live (`DROPPY_DATA_DIR` still honored for compatibility) |
 
 ## Docker
 
@@ -138,15 +155,15 @@ docker compose up -d --build
 Or without compose:
 
 ```bash
-docker build -t droppy .
-docker run -d -p 5150:5150 -e ADMIN_PASSWORD=secret -v droppy-data:/data droppy
+docker build -t zapit .
+docker run -d -p 5150:5150 -e ADMIN_PASSWORD=secret -v zapit-data:/data zapit
 ```
 
 Notes:
 
 - The image runs as a **non-root user** (uid 1000) with `tini` as PID 1 for clean shutdown,
   and ships a **healthcheck** (`docker ps` shows `(healthy)`).
-- State (`state.json` / `config.json`) persists in the `droppy-data` volume. Prefer a bind
+- State (`state.json` / `config.json`) persists in the `zapit-data` volume. Prefer a bind
   mount? Use `-v ./data:/data` and make it writable by uid 1000: `chown 1000:1000 ./data`.
   If the data dir isn't writable, the admin API now **rejects changes with an error** instead
   of silently losing the kill-switch state on restart.
@@ -176,7 +193,7 @@ Notes:
    and `:latest` on tag builds. PRs build but don't push.
 
 The first push creates the GHCR package as **private** — flip it to public under
-repo → Packages → droppy → Package settings for anonymous pulls. Dependabot keeps the
+repo → Packages → zapit → Package settings for anonymous pulls. Dependabot keeps the
 action pins and npm deps fresh.
 
 ## Development & tests
@@ -187,9 +204,9 @@ npm run test:unit # protocol suite only (server API, relay, admin, kill-switch)
 npm run test:ui   # browser simulation (drives the real UI in two jsdom tabs)
 ```
 
-The unit suite covers static pages, config/LAN endpoints, room pairing, a real 1 MiB binary
-transfer through the relay, signaling relay, admin login, the kill-switch toggle, and its
-persistence.
+The unit suite covers static pages, config/LAN endpoints (including the `QR_URL` override),
+room pairing, a real 1 MiB binary transfer through the relay, signaling relay, admin login,
+the kill-switch toggle, and its persistence.
 
 The browser simulation is the interesting one: it loads the **actual `index.html` UI** into
 two jsdom "tabs" connected to a real server, with `RTCPeerConnection` swapped for a local

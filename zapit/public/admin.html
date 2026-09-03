@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>droppy · admin</title>
+<title>zapit · admin</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚡%3C/text%3E%3C/svg%3E" />
 <style>
   :root {
@@ -70,18 +70,18 @@
 <div class="card">
   <!-- login -->
   <div id="login">
-    <h1>⚡ droppy admin</h1>
+    <h1>⚡ zapit admin</h1>
     <div class="sub">Enter the admin password to manage the auth switch.</div>
     <label for="pw">Admin password</label>
     <input id="pw" type="password" placeholder="••••••••" autocomplete="current-password" />
     <button id="loginBtn">Unlock</button>
     <div id="loginMsg" class="msg"></div>
-    <div class="sub" style="margin-top:18px">Set it via the <b>ADMIN_PASSWORD</b> env var (or <b>droppy/data/config.json</b> → <b>adminPasswordHash</b>).</div>
+    <div class="sub" style="margin-top:18px">Set it via the <b>ADMIN_PASSWORD</b> env var (or <b>zapit/data/config.json</b> → <b>adminPasswordHash</b>).</div>
   </div>
 
   <!-- panel -->
   <div id="panel" class="hidden">
-    <h1>⚡ droppy admin</h1>
+    <h1>⚡ zapit admin</h1>
     <div class="sub">Control whether login is required to pair devices.</div>
 
     <div class="switchrow">
@@ -109,21 +109,21 @@
     <button id="copyBlueprint" class="ghostBtn">⧉ Copy blueprint YAML</button>
     <div class="note">
       Paste into Authentik under <b>Customize → Blueprints → Create</b>, or mount it as
-      <code>/blueprints/droppy.yaml</code>. Requires <code>PUBLIC_URL</code> on droppy
+      <code>/blueprints/zapit.yaml</code>. Requires <code>PUBLIC_URL</code> on zapit
       (it defines the redirect URI) and <code>AUTHENTIK_CLIENT_ID</code> to match the
       generated <code>client_id</code>.
     </div>
 
     <button id="logoutBtn" class="ghost" style="background:transparent;color:var(--muted);border:1px solid var(--line)">Lock admin panel</button>
   </div>
-  <div style="text-align:center;margin-top:18px"><a href="/">← back to droppy</a></div>
+  <div style="text-align:center;margin-top:18px"><a href="/">← back to zapit</a></div>
 </div>
 
 <script>
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
-  let token = sessionStorage.getItem('droppy_admin') || '';
+  let token = sessionStorage.getItem('zapit_admin') || '';
 
   const authHeaders = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` });
 
@@ -140,7 +140,7 @@
       const j = await r.json();
       if (!r.ok) { $('loginMsg').textContent = j.error || 'Login failed'; $('loginMsg').className = 'msg err'; return; }
       token = j.token;
-      sessionStorage.setItem('droppy_admin', token);
+      sessionStorage.setItem('zapit_admin', token);
       $('pw').value = '';
       showPanel();
     } catch (e) {
@@ -152,7 +152,7 @@
   async function showPanel() {
     const r = await fetch('/api/admin/state', { headers: authHeaders() });
     if (r.status === 401 || r.status === 403 || r.status === 409) {
-      token = ''; sessionStorage.removeItem('droppy_admin');
+      token = ''; sessionStorage.removeItem('zapit_admin');
       $('panel').classList.add('hidden'); $('login').classList.remove('hidden');
       if (r.status === 409) { $('loginMsg').textContent = (await r.json()).error; }
       return;
@@ -197,7 +197,7 @@
 
   $('loginBtn').onclick = login;
   $('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
-  $('logoutBtn').onclick = () => { token = ''; sessionStorage.removeItem('droppy_admin'); $('panel').classList.add('hidden'); $('login').classList.remove('hidden'); };
+  $('logoutBtn').onclick = () => { token = ''; sessionStorage.removeItem('zapit_admin'); $('panel').classList.add('hidden'); $('login').classList.remove('hidden'); };
 
   // authentik blueprint: download / copy
   async function blueprintText() {
@@ -210,7 +210,7 @@
       const text = await blueprintText();
       const url = URL.createObjectURL(new Blob([text], { type: 'application/yaml' }));
       const a = document.createElement('a');
-      a.href = url; a.download = 'droppy-authentik.yaml';
+      a.href = url; a.download = 'zapit-authentik.yaml';
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
     } catch (e) { $('panelMsg').textContent = e.message; $('panelMsg').className = 'msg err'; }
