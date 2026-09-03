@@ -8,21 +8,45 @@
 <style>
   :root {
     --bg: #0b0d10; --panel: #12161c; --panel2: #171c24; --line: #232b36;
-    --text: #e8edf4; --muted: #8b96a5; --accent: #6ee7ff; --accent2: #7c9dff;
+    --text: #e8edf4; --muted: #8b96a5; --accent: #fbbf24; --accent2: #d97706;
+    --gold-hot: #fcd34d; --gold-deep: #d97706;
     --ok: #4ade80; --err: #f87171; --radius: 14px;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; min-height: 100vh;
     font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: radial-gradient(900px 500px at 80% -10%, rgba(124,157,255,.10), transparent 60%), var(--bg);
+    background: radial-gradient(900px 500px at 80% -10%, rgba(217,119,6,.10), transparent 60%), var(--bg);
     color: var(--text); display: flex; align-items: center; justify-content: center; padding: 24px;
     -webkit-font-smoothing: antialiased;
   }
   .card {
     width: 100%; max-width: 460px;
     background: linear-gradient(180deg, var(--panel), var(--panel2));
-    border: 1px solid var(--line); border-radius: var(--radius); padding: 26px;
+    border: 1px solid rgba(251,191,36,.3); border-radius: var(--radius); padding: 26px;
+    position: relative;
+    box-shadow: 0 0 20px rgba(217,119,6,.15), inset 0 0 24px rgba(251,191,36,.03);
+  }
+  .card .cbolt { position: absolute; width: 18px; height: 24px; opacity: 0; }
+  .card .cbolt.tl { top: -10px; left: -11px; }
+  .card .cbolt.tr { top: -10px; right: -11px; transform: scaleX(-1); }
+  .card .cbolt.bl { bottom: -10px; left: -11px; transform: scaleY(-1); }
+  .card .cbolt.br { bottom: -10px; right: -11px; transform: scale(-1); }
+  @media (prefers-reduced-motion: no-preference) {
+    .card { animation: cardGlow 3.2s ease-in-out infinite; }
+    .card .cbolt { animation: twinkle 3.2s ease-in-out infinite; }
+    .card .cbolt.tr { animation-delay: .8s; }
+    .card .cbolt.br { animation-delay: 1.6s; }
+    .card .cbolt.bl { animation-delay: 2.4s; }
+    #loginBtn { animation: zapGlow 3.2s ease-in-out infinite; }
+  }
+  @keyframes cardGlow {
+    0%, 100% { box-shadow: 0 0 12px rgba(217,119,6,.12), inset 0 0 24px rgba(251,191,36,.03); }
+    50%      { box-shadow: 0 0 28px rgba(245,158,11,.4), inset 0 0 24px rgba(251,191,36,.05); }
+  }
+  @keyframes zapGlow {
+    0%, 100% { box-shadow: 0 0 6px rgba(217,119,6,.22); }
+    50%      { box-shadow: 0 0 16px rgba(245,158,11,.55); }
   }
   h1 { font-size: 20px; margin: 0 0 4px; }
   .sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
@@ -61,7 +85,7 @@
   a { color: var(--accent); text-decoration: none; }
   .hidden { display: none !important; }
   .ghostBtn { background: transparent; color: var(--muted); border: 1px solid var(--line); margin-top: 10px; font-weight: 500; }
-  .ghostBtn:hover { color: var(--text); }
+  .ghostBtn:hover { color: var(--gold-hot); border-color: rgba(251,191,36,.55); box-shadow: 0 0 10px rgba(217,119,6,.3); }
   .note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
   h1 {
     text-transform: uppercase; letter-spacing: .18em; font-weight: 800;
@@ -93,6 +117,11 @@
 </head>
 <body>
 <div class="card">
+  <svg class="cbolt tl" viewBox="0 0 14 18" aria-hidden="true"><path d="M9 1 L3 10 H7 L5 17 L12 7 H8 Z" fill="#fbbf24"/></svg>
+  <svg class="cbolt tr" viewBox="0 0 14 18" aria-hidden="true"><path d="M9 1 L3 10 H7 L5 17 L12 7 H8 Z" fill="#fcd34d"/></svg>
+  <svg class="cbolt bl" viewBox="0 0 14 18" aria-hidden="true"><path d="M9 1 L3 10 H7 L5 17 L12 7 H8 Z" fill="#f59e0b"/></svg>
+  <svg class="cbolt br" viewBox="0 0 14 18" aria-hidden="true"><path d="M9 1 L3 10 H7 L5 17 L12 7 H8 Z" fill="#fef3c7"/></svg>
+
   <!-- login -->
   <div id="login">
     <h1><svg class="bolt" viewBox="0 0 48 64" aria-hidden="true"><defs><linearGradient id="boltGradA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffbeb"/><stop offset=".3" stop-color="#fcd34d"/><stop offset=".55" stop-color="#f59e0b"/><stop offset=".8" stop-color="#d97706"/><stop offset="1" stop-color="#92400e"/></linearGradient><filter id="boltGlowA" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path class="bolt-body" filter="url(#boltGlowA)" fill="url(#boltGradA)" d="M32 2 L4 40 H17 L12 62 L44 24 H29 Z"/><path class="spark s1" d="M7 6 l3 5 -2.5 1 3 5" stroke="#fcd34d" stroke-width="1.6" fill="none" stroke-linecap="round"/><path class="spark s2" d="M42 8 l-3 5 2.5 1 -3 5" stroke="#f59e0b" stroke-width="1.4" fill="none" stroke-linecap="round"/><path class="spark s3" d="M43 42 l-3 4 2.5 1.5 -3 4" stroke="#d97706" stroke-width="1.6" fill="none" stroke-linecap="round"/><path class="spark s4" d="M4 48 l3 4 -2.5 1.5 3 4" stroke="#fef3c7" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>zapit admin</h1>
