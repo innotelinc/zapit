@@ -1,0 +1,67 @@
+# Production deployment for https://droppy.innotel.us
+#
+# 1. Copy .env.example to .env next to this file and set at minimum:
+#      ADMIN_PASSWORD=<secret>
+#      AUTHENTIK_BASE_URL=https://<your-authentik-host>
+#      AUTHENTIK_CLIENT_ID=droppy
+#    (PUBLIC_URL is already pinned to https://droppy.innotel.us below)
+#
+# 2. Point DNS for droppy.innotel.us at this host (A/AAAA record), ports 80+443 open.
+#
+# 3. Bring it up:
+#      docker compose -f docker-compose.prod.yml up -d
+#    Caddy terminates TLS (Let's Encrypt) and proxies to the droppy container.
+#    WebSocket upgrades are handled automatically.
+#
+# 4. Apply the Authentik blueprint once: open https://droppy.innotel.us/admin →
+#    "Download blueprint YAML" → paste into Authentik (Customize → Blueprints → Create),
+#    or mount authentik/blueprint.yaml into the authentik worker as /blueprints/droppy.yaml.
+#    client_id must match AUTHENTIK_CLIENT_ID (blueprint default: droppy).
+#
+# 5. Flip "Require Authentik login" in /admin when ready.
+#
+# Note: pulling ghcr.io/innotelinc/droppy requires the GHCR package to be public
+# (repo → Packages → droppy → Package settings) or a `docker login ghcr.io` with a
+# package-scoped token.
+
+services:
+  droppy:
+    image: ghcr.io/innotelinc/droppy:latest
+    container_name: droppy
+    restart: unless-stopped
+    environment:
+      PORT: "5150"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}"
+      PUBLIC_URL: "https://droppy.innotel.us"
+      AUTHENTIK_BASE_URL: "${AUTHENTIK_BASE_URL:-}"
+      AUTHENTIK_SLUG: "${AUTHENTIK_SLUG:-droppy}"
+      AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
+      AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
+      AUTHENTIK_SCOPES: "${AUTHENTIK_SCOPES:-openid profile email}"
+      AUTH_ENABLED: "${AUTH_ENABLED:-false}"
+    volumes:
+      - droppy-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5150/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: droppy-caddy
+    restart: unless-stopped
+    depends_on:
+      - droppy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  droppy-data:
+  caddy-data:
+  caddy-config:
