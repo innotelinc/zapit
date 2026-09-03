@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0d10" />
+<title>Droppy · zap files between devices</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚡%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #0b0d10; --panel: #12161c; --panel2: #171c24; --line: #232b36;
+    --text: #e8edf4; --muted: #8b96a5; --accent: #6ee7ff; --accent2: #7c9dff;
+    --ok: #4ade80; --warn: #fbbf24; --err: #f87171; --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    background:
+      radial-gradient(1200px 700px at 85% -10%, rgba(124,157,255,.10), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(110,231,255,.08), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 18px 60px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 26px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; letter-spacing: .3px; }
+  .logo .bolt { font-size: 24px; filter: drop-shadow(0 0 12px rgba(110,231,255,.45)); }
+  .badge { font-size: 12px; color: var(--muted); border: 1px solid var(--line); padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+  .badge a { color: inherit; text-decoration: none; font-weight: 600; }
+
+  .card {
+    background: linear-gradient(180deg, var(--panel), var(--panel2));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px;
+    margin-bottom: 18px;
+  }
+  .grid { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+
+  .label { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin-bottom: 8px; }
+  .roomcode { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .roomcode input {
+    background: #0d1117; color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px; font-size: 22px; font-weight: 700;
+    letter-spacing: .35em; text-transform: uppercase; width: 100%; outline: none;
+    transition: border-color .15s;
+  }
+  .roomcode input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(110,231,255,.12); }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #081018; border: none; border-radius: 10px; padding: 12px 18px;
+    transition: transform .08s ease, filter .15s;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: scale(.98); }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
+  button.ghost:hover { color: var(--text); border-color: #334052; }
+  button.small { padding: 7px 12px; font-size: 13px; border-radius: 8px; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  #qr { width: 128px; height: 128px; border-radius: 12px; border: 1px solid var(--line); cursor: zoom-in; image-rendering: pixelated; }
+  .qrbox { text-align: center; }
+  .qrbox .cap { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  #drop {
+    border: 2px dashed #2b3644; border-radius: var(--radius); padding: 42px 20px;
+    text-align: center; color: var(--muted); transition: all .18s ease; cursor: pointer;
+    background: rgba(255,255,255,.015);
+  }
+  #drop.drag { border-color: var(--accent); background: rgba(110,231,255,.06); color: var(--text); transform: scale(1.01); }
+  #drop .big { font-size: 34px; margin-bottom: 8px; }
+  #drop strong { color: var(--text); }
+  #drop .hint { font-size: 13px; margin-top: 6px; }
+
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; min-height: 20px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4b5563; display: inline-block; }
+  .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .dot.wait { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+
+  .batchbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
+  .batchbar .sum { font-size: 13px; color: var(--muted); }
+
+  #transfers { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .t {
+    background: #0d1117; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+    animation: pop .18s ease;
+  }
+  @keyframes pop { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .t .top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .t .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+  .t .meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .bar { height: 6px; background: #1a212b; border-radius: 99px; margin-top: 8px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 99px; transition: width .2s ease; }
+  .t.done .bar > i { background: var(--ok); }
+  .t .acts { margin-top: 8px; display: flex; gap: 8px; }
+
+  .textgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .textgrid { grid-template-columns: 1fr; } }
+  textarea {
+    width: 100%; min-height: 96px; resize: vertical;
+    background: #0d1117; color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    outline: none;
+  }
+  textarea:focus { border-color: var(--accent); }
+  .toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+    background: #151b23; border: 1px solid var(--line); color: var(--text);
+    padding: 10px 16px; border-radius: 10px; font-size: 14px; opacity: 0; pointer-events: none;
+    transition: all .25s ease; box-shadow: 0 8px 30px rgba(0,0,0,.5); z-index: 60;
+    max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast .lnk { color: var(--accent); cursor: pointer; font-weight: 600; margin-left: 8px; }
+  .modal { position: fixed; inset: 0; background: rgba(4,6,9,.8); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  .modal.show { display: flex; }
+  .modal img { max-width: min(80vw, 420px); border-radius: 16px; }
+  footer { text-align: center; color: #55606e; font-size: 12px; margin-top: 30px; }
+  footer a { color: inherit; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><span class="bolt">⚡</span> droppy</div>
+    <div id="authBadge" class="badge hidden"></div>
+  </header>
+
+  <div class="card">
+    <div class="grid">
+      <div>
+        <div class="label">Room code — same code on every device</div>
+        <div class="roomcode">
+          <input id="room" maxlength="24" autocomplete="off" spellcheck="false" placeholder="zap-421" />
+          <button id="joinBtn" class="small">Pair</button>
+          <button id="randBtn" class="small ghost" title="New random room">Random</button>
+        </div>
+        <div class="status" style="margin-top:12px">
+          <span id="dot" class="dot"></span><span id="statusText">Enter a room code to pair devices.</span>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button id="rotateBtn" class="small ghost hidden">↻ New code</button>
+          <span class="badge" id="expiry" title="Room code rotates automatically when idle"></span>
+        </div>
+      </div>
+      <div class="qrbox">
+        <img id="qr" alt="QR code with this device's LAN address" title="Scan from your phone" />
+        <div class="cap" id="lanUrl">…</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="drop">
+    <div class="big">🗂️</div>
+    <div><strong>Drop files or folders here</strong> · <span id="pickFiles" style="text-decoration:underline;cursor:pointer">browse</span> · <span id="pickFolder" style="text-decoration:underline;cursor:pointer">folder</span></div>
+    <div class="hint">Multi-file drops arrive as one ZIP on the other side · nothing is stored on the server</div>
+  </div>
+  <input id="file" type="file" multiple hidden />
+  <input id="dir" type="file" webkitdirectory hidden />
+
+  <div class="batchbar hidden" id="batchbar">
+    <span class="sum" id="batchSum"></span>
+    <button id="saveAllBtn" class="small">⬇ Save all as ZIP</button>
+  </div>
+  <div id="transfers"></div>
+
+  <div class="card" style="margin-top:18px">
+    <div class="label">Zap a snippet</div>
+    <div class="textgrid">
+      <textarea id="txtOut" placeholder="Type text and hit send → arrives on paired devices"></textarea>
+      <div>
+        <textarea id="txtIn" placeholder="Received text appears here" readonly></textarea>
+        <div class="row" style="margin-top:10px">
+          <button id="sendTxt" class="small">Send text</button>
+          <button id="copyTxt" class="small ghost">Copy received</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>droppy · <span id="modeTag" title="p2p = direct, relay = via server">mode: —</span> · <a href="/admin" id="adminLink">admin</a></footer>
+</div>
+
+<div class="modal" id="modal"><img id="modalImg" alt="QR code enlarged" /></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const roomEl = $('room'), statusText = $('statusText'), dot = $('dot');
+  const drop = $('drop'), fileInput = $('file'), dirInput = $('dir'), transfersEl = $('transfers');
+
+  const IS_SIM = typeof window !== 'undefined' && window.droppySim === true;
+  const WS_CHUNK = IS_SIM ? 64 * 1024 : 256 * 1024; // bytes per relayed chunk
+  const DC_CHUNK  = IS_SIM ? 64 * 1024 : 16 * 1024; // bytes per WebRTC message
+  const DC_BUF_MAX = 4 * 1024 * 1024;               // dc.bufferedAmount high-water mark
+  const DC_LOW     = 512 * 1024;                    // resume threshold
+  const WEBRTC_TIMEOUT = 8000;
+
+  let ws = null, joined = false, myId = null;
+  let peers = {}; // id -> {name, dc, dcOpen, dcBuf}
+  let transferSeq = 0;
+  const sendRows = {}; // tid -> row element
+
+  /* ============ room expiry ============ */
+  const ROOM_TTL = IS_SIM ? 1200 : 15 * 60 * 1000; // rotates when idle (sim: 1.2 s)
+  const room = {
+    name: null, expiresAt: 0, timer: null, tick: null,
+    arm(ms = ROOM_TTL) {
+      this.expiresAt = Date.now() + ms;
+      $('rotateBtn').classList.remove('hidden');
+      if (!this.tick) this.tick = setInterval(() => this.render(), 1000);
+    },
+    remaining() { return Math.max(0, this.expiresAt - Date.now()); },
+    render() {
+      const el = $('expiry');
+      if (!this.name) { el.textContent = ''; return; }
+      if (!this.expiresAt) return; // paused while peers are paired
+      const s = Math.ceil(this.remaining() / 1000);
+      el.textContent = `expires in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      el.title = 'Room code rotates automatically when the timer hits zero (paused while other devices are paired)';
+    },
+    touch() { if (this.name) this.arm(); },
+    pause() { this.expiresAt = 0; $('expiry').textContent = 'room locked while paired'; },
+    fire() {
+      if (!this.name) return;
+      if (Object.keys(peers).length > 0) { this.pause(); return; }
+      const old = this.name;
+      disconnectWS();
+      const fresh = randomCode();
+      roomEl.value = fresh;
+      localStorage.setItem('droppy_room', fresh);
+      toast(`Room ${old} expired — new code: ${fresh}`);
+      connect();
+    },
+    schedule() {
+      clearTimeout(this.timer);
+      this.timer = setTimeout(() => this.fire(), ROOM_TTL);
+    },
+  };
+
+  /* ============ helpers ============ */
+  const fmtBytes = (n) => {
+    if (!Number.isFinite(n) || n < 0) return '0 B';
+    const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i === 0 ? n : n.toFixed(1)) + ' ' + u[i];
+  };
+  const toast = (msg) => {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove('show'), 2600);
+  };
+  const toastAction = (msg, label, fn) => {
+    const t = $('toast');
+    t.innerHTML = '';
+    const s = document.createElement('span'); s.textContent = msg;
+    const a = document.createElement('span'); a.className = 'lnk'; a.textContent = label;
+    a.onclick = () => { fn(); t.classList.remove('show'); };
+    t.append(s, a);
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove('show'), 6000);
+  };
+  const setStatus = (text, cls) => { statusText.textContent = text; dot.className = 'dot' + (cls ? ' ' + cls : ''); };
+  const deviceName = () => {
+    let n = localStorage.getItem('droppy_name');
+    if (!n) {
+      const ua = navigator.userAgent;
+      const kind = /iPhone|iPad|iPod/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows PC' : /Linux/.test(ua) ? 'Linux' : 'Device';
+      const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+      n = `${kind} · ${browser}`;
+      localStorage.setItem('droppy_name', n);
+    }
+    return n;
+  };
+  const randomCode = () => {
+    const words = ['zap', 'bolt', 'flux', 'nova', 'pixel', 'echo', 'laser', 'orbit', 'pulse', 'spark'];
+    const w = words[Math.floor(Math.random() * words.length)];
+    const n = Math.floor(100 + Math.random() * 900);
+    return `${w}-${n}`;
+  };
+
+  /* ============ ZIP builder (store method, no deps) ============ */
+  const CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(buf) {
+    let c = 0xffffffff;
+    for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+  function dosDateTime(d) {
+    const time = ((d.getHours() & 31) << 11) | ((d.getMinutes() & 63) << 5) | ((Math.floor(d.getSeconds() / 2)) & 31);
+    const date = (((d.getFullYear() - 1980) & 127) << 9) | (((d.getMonth() + 1) & 15) << 5) | (d.getDate() & 31);
+    return { time, date };
+  }
+  async function buildZip(entries) {
+    // entries: [{name (relative path), blob}]
+    const enc = new TextEncoder();
+    const locals = [], centrals = [];
+    let offset = 0;
+    const { time, date } = dosDateTime(new Date());
+    for (const e of entries) {
+      let nameBytes = enc.encode(e.name);
+      if (nameBytes.length > 65535) nameBytes = nameBytes.slice(0, 65535);
+      const data = new Uint8Array(await e.blob.arrayBuffer());
+      const crc = crc32(data);
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true);
+      lh.setUint16(4, 20, true);          // version needed
+      lh.setUint16(6, 0x0800, true);      // UTF-8 flag
+      lh.setUint16(8, 0, true);           // method: store
+      lh.setUint16(10, time, true);
+      lh.setUint16(12, date, true);
+      lh.setUint32(14, crc, true);
+      lh.setUint32(18, data.length, true);
+      lh.setUint32(22, data.length, true);
+      lh.setUint16(26, nameBytes.length, true);
+      lh.setUint16(28, 0, true);
+      locals.push(new Uint8Array(lh.buffer), nameBytes, data);
+
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true);
+      ch.setUint16(4, 20, true);
+      ch.setUint16(6, 20, true);
+      ch.setUint16(8, 0x0800, true);
+      ch.setUint16(10, 0, true);
+      ch.setUint16(12, time, true);
+      ch.setUint16(14, date, true);
+      ch.setUint32(16, crc, true);
+      ch.setUint32(20, data.length, true);
+      ch.setUint32(24, data.length, true);
+      ch.setUint16(28, nameBytes.length, true);
+      ch.setUint32(42, offset, true);
+      centrals.push(new Uint8Array(ch.buffer), nameBytes);
+
+      offset += 30 + nameBytes.length + data.length;
+    }
+    const centralSize = centrals.reduce((s, p) => s + p.length, 0);
+    const eocd = new DataView(new ArrayBuffer(22));
+    eocd.setUint32(0, 0x06054b50, true);
+    eocd.setUint16(8, entries.length, true);
+    eocd.setUint16(10, entries.length, true);
+    eocd.setUint32(12, centralSize, true);
+    eocd.setUint32(16, offset, true);
+    return new Blob([...locals, ...centrals, new Uint8Array(eocd.buffer)], { type: 'application/zip' });
+  }
+
+  /* ============ drop target & picker ============ */
+  drop.onclick = (e) => { if (!e.target.closest('#pickFiles,#pickFolder')) fileInput.click(); };
+  $('pickFiles').onclick = (e) => { e.stopPropagation(); fileInput.click(); };
+  $('pickFolder').onclick = (e) => { e.stopPropagation(); dirInput.click(); };
+  fileInput.onchange = () => { sendDropped([...fileInput.files]); fileInput.value = ''; };
+  dirInput.onchange = () => { sendDropped([...dirInput.files]); dirInput.value = ''; };
+  ['dragenter', 'dragover'].forEach((n) => drop.addEventListener(n, (e) => { e.preventDefault(); drop.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach((n) => drop.addEventListener(n, (e) => { e.preventDefault(); drop.classList.remove('drag'); }));
+  drop.addEventListener('drop', (e) => sendDropped([...e.dataTransfer.files]));
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => { e.preventDefault(); if (!drop.contains(e.target)) sendDropped([...e.dataTransfer.files]); });
+
+  /* ============ sending ============ */
+  async function sendDropped(files) {
+    if (!files.length) return;
+    if (!joined) { toast('Pair a room first — type the same code on both devices'); return; }
+    const peerIds = Object.keys(peers).filter((id) => peers[id].ready);
+    if (!peerIds.length) { toast('No paired devices yet'); return; }
+    const tid = ++transferSeq;
+    const multi = files.length > 1;
+    const base = multi ? `droppy-${tid}.zip` : files[0].name;
+    const totalSize = files.reduce((s, f) => s + f.size, 0);
+    const row = addRow(base, totalSize, '↑ negotiating');
+    sendRows[tid] = row;
+
+    if (multi) {
+      // receiver wants a single ZIP: stream one synthetic entry
+      const zipBlob = await buildZip(files.map((f) => ({ name: f.webkitRelativePath || f.name, blob: f })));
+      await streamEntry(peerIds, tid, 0, zipBlob, base, 'application/zip', 1);
+      finishSendRow(row, `✓ sent · ${fmtBytes(zipBlob.size)}`);
+      toast(`Zapped ${files.length} files as one ZIP ⚡`);
+      return;
+    }
+    const f = files[0];
+    await streamEntry(peerIds, tid, 0, f, f.name, f.type, 1);
+    finishSendRow(row, `✓ sent · ${fmtBytes(f.size)}`);
+    toast('Zapped! Check the other device');
+  }
+
+  function finishSendRow(row, label) { row.classList.add('done'); setRow(row, 100, label); }
+
+  async function streamEntry(peerIds, tid, index, src, name, mime, count) {
+    const pathAttr = src.webkitRelativePath || name;
+    for (const pid of peerIds) {
+      const p = peers[pid];
+      if (!window.__forceRelay && p.dc && p.dc.readyState === 'open') {
+        const row = sendRows[tid];
+        await sendViaDC(p, tid, index, pathAttr, name, mime, count, src.size, src, row);
+      } else {
+        const meta = { type: 'file-meta', tid, index, path: pathAttr, name, size: src.size, mime: mime || 'application/octet-stream', count };
+        p.ws.send(JSON.stringify(meta));
+        await sendViaWS(p, tid, index, src, sendRows[tid]);
+      }
+    }
+  }
+
+  async function sendViaWS(p, tid, index, src, row) {
+    let offset = 0;
+    while (offset < src.size) {
+      if (p.ws.bufferedAmount > 8 * 1024 * 1024) await new Promise((r) => setTimeout(r, 40));
+      const buf = await src.slice(offset, offset + WS_CHUNK).arrayBuffer();
+      const packet = new Uint8Array(8 + buf.byteLength);
+      const view = new DataView(packet.buffer);
+      view.setUint32(0, myId || 0);
+      view.setUint32(4, (tid << 8) | (index & 0xff));
+      packet.set(new Uint8Array(buf), 8);
+      p.ws.send(packet);
+      offset += buf.byteLength;
+      if (row && src.size) setRow(row, Math.min(100, (offset / src.size) * 100), `↑ sending · ${fmtBytes(offset)} / ${fmtBytes(src.size)}`);
+    }
+    p.ws.send(JSON.stringify({ type: 'file-done', tid }));
+  }
+
+  async function sendViaDC(p, tid, index, pathAttr, name, mime, count, size, src, row) {
+    const meta = { type: 'file-meta', tid, index, path: pathAttr, name, size, mime: mime || 'application/octet-stream', count, via: 'p2p', from: myId };
+    p.dc.send(JSON.stringify(meta));
+    const chunk = DC_CHUNK;
+    let offset = 0;
+    while (offset < size) {
+      if (p.dc.bufferedAmount > DC_BUF_MAX) {
+        await new Promise((res) => { p.dcResume = res; });
+      }
+      const slice = src.slice(offset, offset + chunk);
+      const buf = await slice.arrayBuffer();
+      p.dc.send(buf);
+      offset += buf.byteLength;
+      if (row && size) setRow(row, Math.min(100, (offset / size) * 100), `↑ sending (p2p) · ${fmtBytes(offset)} / ${fmtBytes(size)}`);
+    }
+    p.dc.send(JSON.stringify({ type: 'file-done', tid, from: myId }));
+  }
+
+  /* ============ receiving ============ */
+  const incoming = {}; // key `${from}:${tid}` -> entry
+  const readyFiles = []; // {name, blob}
+
+  function entryKey(from, tid) { return `${from}:${tid}`; }
+
+  function allocEntry(key, meta) {
+    incoming[key] = {
+      meta, parts: [], got: 0, done: false,
+      row: addRow(meta.name, meta.size, meta.via === 'p2p' ? '↓ receiving (p2p)' : '↓ receiving'),
+    };
+    return incoming[key];
+  }
+
+  function handleFileMeta(meta) {
+    const key = entryKey(meta.from, meta.tid);
+    const e = incoming[key] || allocEntry(key, meta);
+    if (meta.index === e.lastIndex + 1) { // new file inside a multi batch
+      e.row = addRow(meta.name, meta.size, meta.via === 'p2p' ? '↓ receiving (p2p)' : '↓ receiving');
+    }
+    e.lastIndex = meta.index;
+  }
+
+  function handleChunk(blob) {
+    if (blob.size <= 8) return;
+    const slice = blob.slice(8);
+    // relay mode: route to the oldest pending entry (one active stream per socket)
+    const keys = Object.keys(incoming).filter((k) => !incoming[k].done);
+    if (!keys.length) return;
+    const e = incoming[keys[0]];
+    e.parts.push(slice);
+    e.got += slice.size;
+    if (e.row && e.meta.size) setRow(e.row, Math.min(100, (e.got / e.meta.size) * 100), `↓ receiving · ${fmtBytes(e.got)} / ${fmtBytes(e.meta.size)}`);
+  }
+
+  function handleChunkDC(from, tid, data) {
+    const e = incoming[entryKey(from, tid)];
+    if (!e) return;
+    const blob = data instanceof Blob ? data : new Blob([data]);
+    if (!blob.size) return; // ignore empty frames
+    e.parts.push(blob);
+    e.got += blob.size;
+    if (e.row && e.meta.size) setRow(e.row, Math.min(100, (e.got / e.meta.size) * 100), `↓ receiving (p2p) · ${fmtBytes(e.got)} / ${fmtBytes(e.meta.size)}`);
+  }
+
+  function dcSendResume(p) { if (p.dcResume) { const r = p.dcResume; p.dcResume = null; r(); } }
+
+  function finishEntry(from, tid) {
+    const key = entryKey(from, tid);
+    const e = incoming[key];
+    if (!e || e.done) return;
+    e.done = true;
+    delete incoming[key];
+    const blob = new Blob(e.parts, { type: e.meta.mime || 'application/octet-stream' });
+    readyFiles.push({ name: e.meta.name, blob });
+    updateBatchBar();
+    const row = e.row;
+    row.classList.add('done');
+    setRow(row, 100, `✓ ${e.meta.name} · ${fmtBytes(blob.size)}`);
+    const acts = row.querySelector('.acts');
+    acts.classList.remove('hidden');
+    const btn = acts.querySelector('button');
+    btn.onclick = () => saveBlob(blob, e.meta.name);
+    toastAction(`Got “${e.meta.name}”`, 'Save', () => saveBlob(blob, e.meta.name));
+  }
+
+  function saveBlob(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  }
+
+  function updateBatchBar() {
+    const bar = $('batchbar');
+    if (readyFiles.length > 1) {
+      bar.classList.remove('hidden');
+      const total = readyFiles.reduce((s, f) => s + f.blob.size, 0);
+      $('batchSum').textContent = `${readyFiles.length} received files · ${fmtBytes(total)}`;
+    } else bar.classList.add('hidden');
+  }
+
+  $('saveAllBtn').onclick = async () => {
+    const zip = await buildZip(readyFiles.map((f) => ({ name: f.name, blob: f.blob })));
+    saveBlob(zip, `droppy-received-${Date.now()}.zip`);
+  };
+
+  /* ============ transfer rows ============ */
+  function addRow(name, size, label) {
+    const el = document.createElement('div');
+    el.className = 't';
+    el.innerHTML = `
+      <div class="top"><span class="name"></span><span class="meta"></span></div>
+      <div class="bar"><i></i></div>
+      <div class="acts hidden"><button class="small ghost">Save</button></div>`;
+    el.querySelector('.name').textContent = name;
+    el.querySelector('.meta').textContent = `${label} · ${fmtBytes(size)}`;
+    transfersEl.prepend(el);
+    return el;
+  }
+  const setRow = (el, pct, label) => {
+    el.querySelector('.bar > i').style.width = `${pct}%`;
+    if (label) el.querySelector('.meta').textContent = label;
+  };
+
+  /* ============ websocket + signaling ============ */
+  function disconnectWS() {
+    if (ws) { try { ws.close(); } catch {} ws = null; }
+    joined = false;
+  }
+
+  function connect() {
+    const r = roomEl.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 24);
+    if (!r) { setStatus('Enter a room code first.', 'wait'); roomEl.focus(); return; }
+    room.name = r;
+    localStorage.setItem('droppy_room', r);
+
+    disconnectWS();
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'join', room: r }));
+    ws.onmessage = (ev) => {
+      // binary frames can be Blob or ArrayBuffer (or cross-realm lookalikes) —
+      // wrapping any of them in a Blob is always byte-safe
+      if (typeof ev.data !== 'string') return handleChunk(new Blob([ev.data]));
+      let m; try { m = JSON.parse(ev.data); } catch { return; }
+      switch (m.type) {
+        case 'joined':
+          joined = true;
+          myId = m.yourId;
+          ws.send(JSON.stringify({ type: 'hello', name: deviceName() }));
+          setStatus(Object.keys(peers).length ? 'Devices paired — drop files anytime ⚡' : `Paired as “${r}” — waiting for other devices…`, 'on');
+          history.replaceState(null, '', `?room=${r}`);
+          room.arm();
+          room.schedule();
+          break;
+        case 'peer-info':
+          peers[m.id] = peers[m.id] || { name: m.name, dc: null, dcOpen: false, dcBuf: [], ready: true, ws };
+          peers[m.id].name = m.name;
+          setStatus('Devices paired — drop files anytime ⚡', 'on');
+          toast(`Peer joined: ${m.name}`);
+          room.pause();
+          // deterministic tie-break: lower id rings, other side accepts
+          if (joined && myId != null && myId < m.id) ws.send(JSON.stringify({ type: 'ring', to: m.id }));
+          break;
+        case 'peer-joined':
+          setStatus(`${m.count} devices paired — drop files anytime ⚡`, 'on');
+          break;
+        case 'peer-left': {
+          if (m.count <= 1) {
+            for (const id of Object.keys(peers)) { teardownPeer(peers[id]); delete peers[id]; }
+          }
+          setStatus(m.count > 1 ? `${m.count} devices paired` : 'Peer left — you are alone in the room', 'on');
+          if (m.count <= 1) { room.arm(); room.schedule(); }
+          break;
+        }
+        case 'ring':
+          ws.send(JSON.stringify({ type: 'ringing', to: m.from })); // accept: offer follows from ringer
+          break;
+        case 'ringing':
+          startOffer(m.from); // peer accepted our ring — negotiate now
+          break;
+        case 'offer':
+          startAnswer(m.from, m.payload);
+          break;
+        case 'answer': {
+          const p = peers[m.from] || makePeer(m.from);
+          p.pc.setRemoteDescription(m.payload).catch(() => {});
+          break;
+        }
+        case 'ice': {
+          const p = peers[m.from] || makePeer(m.from);
+          if (m.payload) p.pc.addIceCandidate(m.payload).catch(() => {});
+          break;
+        }
+        case 'file-meta':
+          handleFileMeta(m);
+          break;
+        case 'file-done':
+          finishEntry(m.from, m.tid);
+          break;
+        case 'text':
+          $('txtIn').value = m.text;
+          toast('Received text from a paired device');
+          break;
+        case 'error':
+          setStatus(m.error, '');
+          break;
+      }
+    };
+    const myWs = ws; // ignore close events from sockets we already replaced
+    ws.onclose = () => {
+      if (ws !== myWs || !room.name) return;
+      joined = false;
+      setStatus('Disconnected — retrying…', 'wait');
+      setTimeout(() => { if (!joined && ws === myWs && room.name) connect(); }, 1500);
+    };
+    ws.onerror = () => {};
+  }
+
+  function teardownPeer(p) {
+    try { p.dc && p.dc.close(); } catch {}
+    try { p.pc && p.pc.close(); } catch {}
+    p.dc = null; p.pc = null; p.dcOpen = false;
+  }
+
+  /* ---- WebRTC ---- */
+  const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+  function makePeer(id) {
+    if (!peers[id]) peers[id] = { name: 'device', ready: true, ws };
+    const p = peers[id];
+    p.ws = ws;
+    if (p.pc) return p;
+    const pc = new RTCPeerConnection(rtcConfig);
+    p.pc = pc;
+    pc.onicecandidate = (e) => { if (e.candidate) ws.send(JSON.stringify({ type: 'ice', to: Number(id), payload: e.candidate.toJSON() })); };
+    pc.ondatachannel = (e) => attachChannel(p, e.channel);
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') { p.dcOpen = false; }
+    };
+    return p;
+  }
+
+  function attachChannel(p, dc) {
+    p.dc = dc;
+    dc.binaryType = 'arraybuffer';
+    const onOpen = () => {
+      p.dcOpen = true;
+      $('modeTag').textContent = 'mode: p2p';
+      if (p.dcBuf.length) { for (const d of p.dcBuf) routeDC(dc, d); p.dcBuf = []; }
+    };
+    dc.onclose = () => { p.dcOpen = false; if ($('modeTag')) $('modeTag').textContent = 'mode: relay'; };
+    dc.onopen = onOpen;
+    dc.bufferedAmountLowThreshold = DC_LOW;
+    dc.onbufferedamountlow = () => dcSendResume(p);
+    // channel may already be open when ondatachannel fires (common for answerers)
+    if (dc.readyState === 'open') onOpen();
+    dc.onmessage = (ev) => routeDC(dc, ev.data);
+  }
+
+  function routeDC(dc, data) {
+    let t = dcMap.get(dc);
+    if (!t) { t = { from: null, tid: null }; dcMap.set(dc, t); } // answerer side: tag on first message
+    let from = t ? t.from : null;
+    if (typeof data === 'string') {
+      let m; try { m = JSON.parse(data); } catch { return; }
+      // first message on the channel tells us who is on the other end
+      if (t && from == null && m.from != null) { t.from = m.from; from = m.from; }
+      if (m.type === 'file-meta') { if (t) t.tid = m.tid; handleFileMeta({ ...m, from }); }
+      else if (m.type === 'file-done') finishEntry(from, m.tid);
+      return;
+    }
+    if (t && t.tid) handleChunkDC(from, t.tid, new Blob([data]));
+  }
+
+  const dcMap = new WeakMap();
+  function tagDC(dc, from) { dcMap.set(dc, { from, tid: null }); }
+  function dcPeerId(dc) { const t = dcMap.get(dc); return t ? t.from : null; }
+
+  async function startOffer(toId) {
+    if (window.__forceRelay) return; // test/escape hatch: stay on relay
+    const p = makePeer(toId);
+    if (p.dc && p.dc.readyState === 'open') return; // already connected
+    const dc = p.pc.createDataChannel('droppy', { ordered: true });
+    tagDC(dc, Number(toId));
+    attachChannel(p, dc);
+    const offer = await p.pc.createOffer();
+    await p.pc.setLocalDescription(offer);
+    ws.send(JSON.stringify({ type: 'offer', to: Number(toId), payload: p.pc.localDescription }));
+    setTimeout(() => { if (!p.dcOpen && joined) { /* stays on relay silently */ } }, WEBRTC_TIMEOUT);
+  }
+
+  async function startAnswer(fromId, payload) {
+    const p = makePeer(fromId);
+    await p.pc.setRemoteDescription(payload);
+    const answer = await p.pc.createAnswer();
+    await p.pc.setLocalDescription(answer);
+    ws.send(JSON.stringify({ type: 'answer', to: Number(fromId), payload: p.pc.localDescription }));
+  }
+
+  /* ============ text zap ============ */
+  $('sendTxt').onclick = () => {
+    const t = $('txtOut').value.trim();
+    if (!t) return;
+    if (!joined) { toast('Pair a room first'); return; }
+    ws.send(JSON.stringify({ type: 'text', text: t }));
+    toast('Text zapped ⚡');
+  };
+  $('copyTxt').onclick = async () => {
+    const v = $('txtIn').value;
+    if (!v) return;
+    try { await navigator.clipboard.writeText(v); toast('Copied to clipboard'); }
+    catch { $('txtIn').select(); document.execCommand('copy'); toast('Copied'); }
+  };
+
+  /* ============ controls & boot ============ */
+  $('randBtn').onclick = () => { roomEl.value = randomCode(); connect(); };
+  $('joinBtn').onclick = () => connect();
+  $('rotateBtn').onclick = () => { roomEl.value = randomCode(); connect(); toast('Fresh room code — share it again'); };
+  roomEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(); });
+  roomEl.addEventListener('input', () => { roomEl.value = roomEl.value.toUpperCase(); });
+
+  async function boot() {
+    try {
+      const cfg = await fetch('/api/config').then((r) => r.json());
+      const b = $('authBadge');
+      if (cfg.authEnabled && cfg.authenticated) {
+        b.classList.remove('hidden'); b.classList.add('ok');
+        b.innerHTML = `${cfg.user.name || cfg.user.email} · <a href="#" id="logout">log out</a>`;
+        $('logout').onclick = async (e) => { e.preventDefault(); await fetch('/api/auth/logout', { method: 'POST' }); location.reload(); };
+      } else if (cfg.authEnabled && cfg.oidcConfigured) {
+        b.classList.remove('hidden');
+        b.innerHTML = `<a href="/api/auth/start">Sign in with Authentik</a>`;
+      }
+    } catch {}
+    try {
+      const lan = await fetch('/api/lan').then((r) => r.json());
+      $('qr').src = lan.qr;
+      $('lanUrl').textContent = lan.addresses.length ? lan.addresses[0].url : lan.selfUrl;
+    } catch {}
+    $('qr').onclick = () => { $('modalImg').src = $('qr').src; $('modal').classList.add('show'); };
+    $('modal').onclick = () => $('modal').classList.remove('show');
+
+    const urlRoom = new URLSearchParams(location.search).get('room');
+    const saved = localStorage.getItem('droppy_room');
+    if (urlRoom) roomEl.value = urlRoom;
+    else if (saved) roomEl.value = saved;
+    if (roomEl.value) connect();
+  }
+
+  boot();
+
+  // test hooks (no-ops in real usage)
+  window.__droppySend = sendDropped;
+})();
+</script>
+</body>
+</html>

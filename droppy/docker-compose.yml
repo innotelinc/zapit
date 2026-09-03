@@ -1,0 +1,27 @@
+services:
+  droppy:
+    build: .
+    image: droppy:local
+    container_name: droppy
+    ports:
+      - "5150:5150"
+    environment:
+      PORT: "5150"
+      # Set a password so only you can flip the auth switch at /admin.
+      # It's hashed and persisted on first boot, so it survives later env changes.
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      # Authentik SSO (optional — configure then flip the switch in /admin)
+      AUTHENTIK_BASE_URL: "${AUTHENTIK_BASE_URL:-}"
+      AUTHENTIK_SLUG: "${AUTHENTIK_SLUG:-droppy}"
+      AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
+      AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
+      AUTHENTIK_SCOPES: "${AUTHENTIK_SCOPES:-openid profile email}"
+      AUTH_ENABLED: "${AUTH_ENABLED:-false}"
+    volumes:
+      # named volume: owned by the container's node user automatically.
+      # Prefer a bind mount instead? Use ./data:/data and run: chown 1000:1000 ./data
+      - droppy-data:/data
+    restart: unless-stopped
+
+volumes:
+  droppy-data:
