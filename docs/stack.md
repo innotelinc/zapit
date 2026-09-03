@@ -63,4 +63,16 @@ bash scripts/infisical-setup.sh
 See [compose.infisical.yml](../compose.infisical.yml) and
 [scripts/infisical-setup.py](../scripts/infisical-setup.py) for details.
 
+### Runtime resolution (`infisical://`)
+
+With `INFISICAL_ADDR` / `INFISICAL_TOKEN` / `INFISICAL_WORKSPACE_ID` in `.env` (written
+back by `scripts/infisical-setup.py`), the server resolves secrets at startup:
+
+- `ADMIN_PASSWORD` and `AUTHENTIK_CLIENT_SECRET` may be `infisical://<name>`
+  references — resolved synchronously at boot, before the admin hash is computed.
+- Plain values are **mirrored into Infisical on boot** (best-effort), so after one
+  boot you can switch `.env` to references.
+
+Client: `zapit/infisical.js` (zero-dependency, same contract as Cerulean/Onyx).
+
 *zapit · TransferOps · [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack)*
