@@ -1,46 +1,46 @@
-# Authentik blueprint for droppy — creates the OAuth2 provider + application in one shot.
+# Authentik blueprint for zapit — creates the OAuth2 provider + application in one shot.
 #
 # Apply it either way:
 #   1) GitOps: mount into the authentik (worker) container, e.g. in authentik's compose:
-#        - ./blueprint.yaml:/blueprints/droppy.yaml:ro
+#        - ./blueprint.yaml:/blueprints/zapit.yaml:ro
 #      authentik discovers /blueprints/*.yaml automatically and applies it.
 #   2) UI: Customize → Blueprints → Create, and paste this file.
 #
 # Environment variables honoured (set them on the authentik container):
-#   DROPPY_CLIENT_ID   OAuth2 client id droppy presents — must match AUTHENTIK_CLIENT_ID
-#                      on droppy. Default: droppy
+#   ZAPIT_CLIENT_ID    OAuth2 client id zapit presents — must match AUTHENTIK_CLIENT_ID
+#                      on zapit. Default: zapit
 #
-# Then configure droppy:
+# Then configure zapit:
 #   AUTHENTIK_BASE_URL=https://<your-authentik-host>
-#   AUTHENTIK_CLIENT_ID=<same value as DROPPY_CLIENT_ID>
-#   PUBLIC_URL=https://droppy.innotel.us
+#   AUTHENTIK_CLIENT_ID=<same value as ZAPIT_CLIENT_ID>
+#   PUBLIC_URL=https://zapit.innotel.us
 #
-# Finally flip "Require Authentik login" in droppy's /admin panel.
+# Finally flip "Require Authentik login" in zapit's /admin panel.
 version: 1
 metadata:
-  name: droppy
+  name: zapit
 entries:
-  # OAuth2/OIDC provider — public client (PKCE, no secret needed by droppy)
+  # OAuth2/OIDC provider — public client (PKCE, no secret needed by zapit)
   - identifiers:
-      slug: droppy
+      slug: zapit
     model: authentik_providers_oauth2.oauth2provider
-    id: droppy-provider
+    id: zapit-provider
     attrs:
-      name: droppy
+      name: zapit
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
       invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
       client_type: public
-      client_id: !Env [DROPPY_CLIENT_ID, droppy]
+      client_id: !Env [ZAPIT_CLIENT_ID, zapit]
       redirect_uris:
-        # canonical public host — matches droppy's PUBLIC_URL
+        # canonical public host — matches zapit's PUBLIC_URL
         - matching_mode: strict
-          url: https://droppy.innotel.us/api/auth/callback
+          url: https://zapit.innotel.us/api/auth/callback
           redirect_uri_type: authorization
         # local development
         - matching_mode: strict
           url: http://localhost:5150/api/auth/callback
           redirect_uri_type: authorization
-        # optional LAN access — uncomment and adjust to your droppy host:
+        # optional LAN access — uncomment and adjust to your zapit host:
         # - matching_mode: strict
         #   url: http://192.168.1.10:5150/api/auth/callback
         #   redirect_uri_type: authorization
@@ -50,10 +50,10 @@ entries:
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
   # Application (what users click in authentik / my-applications)
   - identifiers:
-      slug: droppy
+      slug: zapit
     model: authentik_core.application
-    id: droppy-application
+    id: zapit-application
     attrs:
-      name: droppy
-      slug: droppy
-      provider: !KeyOf droppy-provider
+      name: zapit
+      slug: zapit
+      provider: !KeyOf zapit-provider

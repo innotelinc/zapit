@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Droppy — drag & drop file transfer between devices (web / LAN).
+ * ZapIt — drag & drop file transfer between devices (web / LAN).
  *
  * No accounts: open the URL, type or scan the room code, drop files.
  * Optional Authentik SSO (OIDC, PKCE) and an admin kill-switch.
@@ -34,21 +34,24 @@ const envBool = (v, dflt) => (v === undefined || v === '' ? dflt : /^(1|true|yes
 const envStr = (v) => (v === undefined || String(v).trim() === '' ? undefined : String(v).trim());
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const DATA_DIR = process.env.DROPPY_DATA_DIR || path.join(__dirname, 'data');
+const DATA_DIR = process.env.ZAPIT_DATA_DIR || process.env.DROPPY_DATA_DIR || path.join(__dirname, 'data');
 const STATE_PATH = path.join(DATA_DIR, 'state.json');
 const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
 
 // Turn Authentik on with a flip of a switch (persisted), or via env for first boot.
 const AUTHENTIK_BASE_URL = envStr(process.env.AUTHENTIK_BASE_URL); // e.g. https://authentik.example.com (or http://host:9000)
-const AUTHENTIK_SLUG = envStr(process.env.AUTHENTIK_SLUG) || 'droppy';
+const AUTHENTIK_SLUG = envStr(process.env.AUTHENTIK_SLUG) || 'zapit';
 const AUTHENTIK_CLIENT_ID = envStr(process.env.AUTHENTIK_CLIENT_ID);
 const AUTHENTIK_CLIENT_SECRET = envStr(process.env.AUTHENTIK_CLIENT_SECRET) || '';
 const AUTHENTIK_SCOPES = envStr(process.env.AUTHENTIK_SCOPES) || 'openid profile email';
-// Canonical public origin (e.g. https://droppy.innotel.us). When set it overrides the
+// Canonical public origin (e.g. https://zapit.innotel.us). When set it overrides the
 // per-request Host for QR/LAN URLs, OIDC redirect URIs and blueprint generation.
 const PUBLIC_URL = envStr(process.env.PUBLIC_URL) ? envStr(process.env.PUBLIC_URL).replace(/\/+$/, '') : null;
+// QR code customization: QR_URL overrides the address the QR code encodes (and the
+// caption link) without touching LAN/PUBLIC_URL behavior. Defaults to the LAN/self URL.
+const QR_URL = envStr(process.env.QR_URL) || null;
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 h
-const COOKIE_NAME = 'droppy_sid';
+const COOKIE_NAME = 'zapit_sid';
 
 /* ----------------------------------------------------------------- state */
 
@@ -98,7 +101,7 @@ function saveState() {
     fs.writeFileSync(STATE_PATH, JSON.stringify({ authEnabled, adminPasswordHash, oidc }, null, 2));
     return true;
   } catch (e) {
-    console.error('[droppy] failed to persist state:', e.message);
+    console.error('[zapit] failed to persist state:', e.message);
     return false;
   }
 }
@@ -268,30 +271,30 @@ async function oidcToken(tokenUrl, body) {
 /* ------------------------------------------------- authentik blueprint */
 
 // Generates an authentik blueprint that creates the OAuth2 provider (public/PKCE client)
-// and application for droppy in one shot. Structure mirrors authentik's own blueprints
+// and application for zapit in one shot. Structure mirrors authentik's own blueprints
 // (blueprints/testing/oidc-conformance.yaml): !Find flow lookups, !KeyOf app→provider link,
 // object-form redirect_uris (authentik 2024.2+).
 function blueprintYaml({ slug, clientId, redirectUri }) {
-  return `# Authentik blueprint for droppy — creates the provider + application in one click.
+  return `# Authentik blueprint for zapit — creates the provider + application in one click.
 #
 # Apply it either way:
-#   * mount into the authentik container as /blueprints/droppy.yaml (auto-applied), or
+#   * mount into the authentik container as /blueprints/zapit.yaml (auto-applied), or
 #   * paste the YAML under Customize → Blueprints → Create.
 #
-# Then configure droppy:
+# Then configure zapit:
 #   AUTHENTIK_BASE_URL=<your authentik URL>
 #   AUTHENTIK_CLIENT_ID=${clientId}
 #   PUBLIC_URL=${redirectUri.replace('/api/auth/callback', '')}
 version: 1
 metadata:
-  name: droppy
+  name: zapit
 entries:
   - identifiers:
       slug: ${slug}
     model: authentik_providers_oauth2.oauth2provider
-    id: droppy-provider
+    id: zapit-provider
     attrs:
-      name: droppy
+      name: zapit
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
       invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
       client_type: public
@@ -307,11 +310,11 @@ entries:
   - identifiers:
       slug: ${slug}
     model: authentik_core.application
-    id: droppy-application
+    id: zapit-application
     attrs:
-      name: droppy
+      name: zapit
       slug: ${slug}
-      provider: !KeyOf droppy-provider
+      provider: !KeyOf zapit-provider
 `;
 }
 
@@ -321,7 +324,7 @@ function requireAdmin(req, res) {
   const auth = req.headers.authorization || '';
   const m = /^Bearer\s+(.+)$/i.exec(auth);
   if (!m) {
-    send(res, 401, { error: 'admin token required' }, { 'WWW-Authenticate': 'Bearer realm="droppy-admin"' });
+    send(res, 401, { error: 'admin token required' }, { 'WWW-Authenticate': 'Bearer realm="zapit-admin"' });
     return null;
   }
   if (!state.adminPasswordHash) {
@@ -419,7 +422,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req, 64 * 1024);
       let pw = '';
       try { pw = String(JSON.parse(body.toString('utf8')).password || ''); } catch {}
-      if (!state.adminPasswordHash) return send(res, 409, { error: 'No admin password configured. Restart with ADMIN_PASSWORD env set, or put adminPasswordHash in droppy/data/config.json.' });
+      if (!state.adminPasswordHash) return send(res, 409, { error: 'No admin password configured. Restart with ADMIN_PASSWORD env set, or put adminPasswordHash in zapit/data/config.json.' });
       if (!pw || !timingSafeEqualStr(sha256(pw), state.adminPasswordHash)) {
         return send(res, 403, { error: 'Wrong admin password' });
       }
@@ -464,25 +467,27 @@ const server = http.createServer(async (req, res) => {
       const host = String(req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`);
       const selfUrl = PUBLIC_URL || `${proto}://${host}`;
       const addrs = PUBLIC_URL ? [{ name: 'public', address: PUBLIC_URL, url: PUBLIC_URL }] : lanAddresses(PORT);
-      const qrData = addrs.length ? addrs[0].url : selfUrl;
+      // QR customization: QR_URL (env) overrides the encoded address; otherwise the
+      // first LAN/public address (or self URL) is used.
+      const qrData = QR_URL || (addrs.length ? addrs[0].url : selfUrl);
       const qr = await QRCode.toDataURL(qrData, { margin: 1, width: 360, color: { dark: '#0b0d10', light: '#ffffff' } });
-      return send(res, 200, { selfUrl, addresses: addrs, qr, port: PORT });
+      return send(res, 200, { selfUrl, addresses: addrs, qr, qrUrl: qrData, port: PORT });
     }
 
     if (p === '/api/authentik/blueprint' && req.method === 'GET') {
       if (!PUBLIC_URL) {
-        return send(res, 400, { error: 'PUBLIC_URL is not set — it defines the redirect URI origin (e.g. PUBLIC_URL=https://droppy.innotel.us)' });
+        return send(res, 400, { error: 'PUBLIC_URL is not set — it defines the redirect URI origin (e.g. PUBLIC_URL=https://zapit.innotel.us)' });
       }
-      const slug = (state.oidc && state.oidc.slug) || AUTHENTIK_SLUG || 'droppy';
-      const clientId = (state.oidc && state.oidc.clientId) || AUTHENTIK_CLIENT_ID || 'droppy';
+      const slug = (state.oidc && state.oidc.slug) || AUTHENTIK_SLUG || 'zapit';
+      const clientId = (state.oidc && state.oidc.clientId) || AUTHENTIK_CLIENT_ID || 'zapit';
       const yaml = blueprintYaml({ slug, clientId, redirectUri: `${PUBLIC_URL}/api/auth/callback` });
-      return send(res, 200, yaml, { 'Content-Type': 'application/yaml; charset=utf-8', 'Content-Disposition': 'attachment; filename="droppy-authentik.yaml"' });
+      return send(res, 200, yaml, { 'Content-Type': 'application/yaml; charset=utf-8', 'Content-Disposition': 'attachment; filename="zapit-authentik.yaml"' });
     }
 
     /* ---- static ---- */
     return serveStatic(req, res, p);
   } catch (err) {
-    console.error('[droppy] request error:', err);
+    console.error('[zapit] request error:', err);
     if (!res.headersSent) send(res, 500, { error: 'Internal error' });
   }
 });
@@ -500,18 +505,18 @@ function joinRoom(ws, room) {
   let set = rooms.get(room);
   if (!set) rooms.set(room, (set = new Set()));
   set.add(ws);
-  ws.droppyRoom = room;
+  ws.zapitRoom = room;
 }
 
 function leaveRoom(ws) {
-  const room = ws.droppyRoom;
+  const room = ws.zapitRoom;
   if (!room) return;
   const set = rooms.get(room);
   if (set) {
     set.delete(ws);
     if (!set.size) rooms.delete(room);
   }
-  ws.droppyRoom = undefined;
+  ws.zapitRoom = undefined;
 }
 
 function roomPeers(room, except) {
@@ -531,8 +536,8 @@ wss.on('connection', (ws, req) => {
     if (isBinary) {
       // Binary file chunk: [uint32 transferId][uint32 chunkIndex][payload]
       // transferId == sender's connId; fan out to every other peer in the room.
-      if (!ws.droppyRoom || data.length <= 8) return;
-      for (const peer of roomPeers(ws.droppyRoom, ws)) {
+      if (!ws.zapitRoom || data.length <= 8) return;
+      for (const peer of roomPeers(ws.zapitRoom, ws)) {
         if (peer.readyState === 1) peer.send(data, { binary: true });
       }
       return;
@@ -547,19 +552,19 @@ wss.on('connection', (ws, req) => {
         if (!room) return wsSend(ws, { type: 'error', error: 'invalid room' });
         leaveRoom(ws);
         joinRoom(ws, room);
-        ws.droppyConnIds = new Set();
+        ws.zapitConnIds = new Set();
         const peers = roomPeers(room, ws);
         wsSend(ws, { type: 'joined', room, peers: peers.length, yourId: nextConnId(ws) });
         for (const peer of peers) wsSend(peer, { type: 'peer-joined', count: roomPeers(room).length + 1 });
         break;
       }
       case 'hello': {
-        if (!ws.droppyRoom) break;
-        ws.droppyName = String(msg.name || 'device').slice(0, 40);
-        const peers = roomPeers(ws.droppyRoom, ws);
+        if (!ws.zapitRoom) break;
+        ws.zapitName = String(msg.name || 'device').slice(0, 40);
+        const peers = roomPeers(ws.zapitRoom, ws);
         for (const peer of peers) {
-          wsSend(ws, { type: 'peer-info', id: nextConnId(peer), name: peer.droppyName || 'device' });
-          wsSend(peer, { type: 'peer-info', id: nextConnId(ws), name: ws.droppyName });
+          wsSend(ws, { type: 'peer-info', id: nextConnId(peer), name: peer.zapitName || 'device' });
+          wsSend(peer, { type: 'peer-info', id: nextConnId(ws), name: ws.zapitName });
         }
         break;
       }
@@ -571,15 +576,15 @@ wss.on('connection', (ws, req) => {
       case 'accept':
       case 'decline': {
         // targeted signaling relay (WebRTC handshake + incoming-transfer notifications)
-        if (!ws.droppyRoom) break;
+        if (!ws.zapitRoom) break;
         const id = Number(msg.to);
-        const peer = roomPeers(ws.droppyRoom, ws).find((c) => c.droppyConnId === id);
+        const peer = roomPeers(ws.zapitRoom, ws).find((c) => c.zapitConnId === id);
         if (peer) {
           wsSend(peer, { type: msg.type, from: nextConnId(ws), payload: msg.payload });
         }
         break;
       }      case 'file-meta': {
-        if (!ws.droppyRoom) break;
+        if (!ws.zapitRoom) break;
         const meta = {
           type: 'file-meta',
           from: nextConnId(ws),
@@ -591,20 +596,20 @@ wss.on('connection', (ws, req) => {
           mime: String(msg.mime || 'application/octet-stream').slice(0, 120),
           count: Math.max(1, Math.min(1000, Number(msg.count) || 1)),
         };
-        for (const peer of roomPeers(ws.droppyRoom, ws)) wsSend(peer, meta);
+        for (const peer of roomPeers(ws.zapitRoom, ws)) wsSend(peer, meta);
         break;
       }
       case 'file-done': {
-        if (!ws.droppyRoom) break;
+        if (!ws.zapitRoom) break;
         const done = { type: 'file-done', from: nextConnId(ws) };
         if (Number.isFinite(Number(msg.tid))) done.tid = Number(msg.tid);
-        for (const peer of roomPeers(ws.droppyRoom, ws)) wsSend(peer, done);
+        for (const peer of roomPeers(ws.zapitRoom, ws)) wsSend(peer, done);
         break;
       }
       case 'text': {
-        if (!ws.droppyRoom) break;
+        if (!ws.zapitRoom) break;
         const t = String(msg.text || '').slice(0, 100_000);
-        for (const peer of roomPeers(ws.droppyRoom, ws)) wsSend(peer, { type: 'text', text: t, from: nextConnId(ws) });
+        for (const peer of roomPeers(ws.zapitRoom, ws)) wsSend(peer, { type: 'text', text: t, from: nextConnId(ws) });
         break;
       }
       case 'leave': {
@@ -617,7 +622,7 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
-    const room = ws.droppyRoom;
+    const room = ws.zapitRoom;
     leaveRoom(ws);
     if (room) {
       const remaining = roomPeers(room);
@@ -629,8 +634,8 @@ wss.on('connection', (ws, req) => {
 
 let connCounter = 1;
 function nextConnId(ws) {
-  if (!ws.droppyConnId) ws.droppyConnId = connCounter++;
-  return ws.droppyConnId;
+  if (!ws.zapitConnId) ws.zapitConnId = connCounter++;
+  return ws.zapitConnId;
 }
 
 const heartbeat = setInterval(() => {
@@ -659,13 +664,13 @@ server.on('upgrade', (req, socket, head) => {
 
 server.listen(PORT, HOST, () => {
   const shown = HOST === '0.0.0.0' ? '0.0.0.0 (all interfaces)' : HOST;
-  console.log(`droppy  ▸  http://localhost:${PORT}`);
+  console.log(`zapit  ▸  http://localhost:${PORT}`);
   console.log(`         ▸  listening on ${shown}`);
   const addrs = lanAddresses(PORT);
   if (addrs.length) console.log(`         ▸  LAN: ${addrs.map((a) => a.url).join('  ')}`);
   console.log(`         ▸  authentik SSO: ${state.oidc ? 'configured' : 'not configured'} | auth switch: ${state.authEnabled ? 'ON' : 'off'}`);
   if (!state.adminPasswordHash) {
-    console.log('         ▸  tip: set ADMIN_PASSWORD env (or droppy/data/config.json adminPasswordHash) to manage the auth switch remotely');
+    console.log('         ▸  tip: set ADMIN_PASSWORD env (or zapit/data/config.json adminPasswordHash) to manage the auth switch remotely');
   }
 });
 

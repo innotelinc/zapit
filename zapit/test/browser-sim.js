@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * browser-sim.js — drives the REAL droppy UI (public/index.html) in jsdom "tabs".
+ * browser-sim.js — drives the REAL zapit UI (public/index.html) in jsdom "tabs".
  *
  * Real:  the actual server, the actual index.html script, actual Blob/File slicing,
  *        ZIP building, chunking, backpressure, room expiry, WebSocket signaling
@@ -131,7 +131,7 @@ function makeTab(name, room = 'simroom') {
     pretendToBeVisual: true,
     virtualConsole: vc,
     beforeParse(window) {
-      window.droppySim = true; // IS_SIM: small chunks, fast room expiry
+      window.zapitSim = true; // IS_SIM: small chunks, fast room expiry
       window.fetch = (input, init) => fetch(String(input).startsWith('http') ? input : `${BASE}${input}`, init);
       // jsdom provides a real origin-scoped localStorage — no shim needed
       Object.defineProperty(window.navigator, 'userAgent', { value: `Mozilla/5.0 ${name} TestBrowser/1.0`, configurable: true });
@@ -202,9 +202,9 @@ const rowNamed = (w, name) => rows(w).find((r) => r.querySelector('.name').textC
 /* ------------- main ------------- */
 
 (async () => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'droppy-sim-'));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zapit-sim-'));
   const server = spawn(process.execPath, [path.join(ROOT, 'server.js')], {
-    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DROPPY_DATA_DIR: dataDir },
+    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', ZAPIT_DATA_DIR: dataDir },
     stdio: ['ignore', 'ignore', 'pipe'],
   });
   server.stderr.on('data', (d) => process.stderr.write(`[server] ${d}`));
@@ -228,7 +228,7 @@ const rowNamed = (w, name) => rows(w).find((r) => r.querySelector('.name').textC
 
     console.log('▶ p2p single-file transfer (A → B) with byte verification');
     const payload = crypto.randomBytes(512 * 1024);
-    A.w.__droppySend([makeFile(A.w, 'hello.bin', payload)]);
+    A.w.__zapitSend([makeFile(A.w, 'hello.bin', payload)]);
     await waitFor(() => {
       const r = rowNamed(B.w, 'hello.bin');
       return r && r.classList.contains('done');
@@ -246,9 +246,9 @@ const rowNamed = (w, name) => rows(w).find((r) => r.querySelector('.name').textC
       makeFile(A.w, 'two.txt', Buffer.from('file number two!'), 'text/plain'),
       makeFile(A.w, 'three.bin', crypto.randomBytes(64 * 1024)),
     ];
-    A.w.__droppySend(files);
-    await waitFor(() => rows(B.w).some((r) => r.querySelector('.name').textContent === 'droppy-2.zip' && r.classList.contains('done')), 10000, 'B received zip');
-    const zipRow = rows(B.w).find((r) => r.querySelector('.name').textContent === 'droppy-2.zip');
+    A.w.__zapitSend(files);
+    await waitFor(() => rows(B.w).some((r) => r.querySelector('.name').textContent === 'zapit-2.zip' && r.classList.contains('done')), 10000, 'B received zip');
+    const zipRow = rows(B.w).find((r) => r.querySelector('.name').textContent === 'zapit-2.zip');
     ok('receiver got one ZIP for the 3-file drop', !!zipRow);
     zipRow.querySelector('.acts button').click();
     await waitFor(() => B._blobs.some((b) => b.blob.size > 64 * 1024 + 200), 3000, 'zip blob captured');
@@ -274,7 +274,7 @@ const rowNamed = (w, name) => rows(w).find((r) => r.querySelector('.name').textC
     A.w.__forceRelay = true;
     B.w.__forceRelay = true;
     const relayPayload = crypto.randomBytes(256 * 1024);
-    A.w.__droppySend([makeFile(A.w, 'relay.bin', relayPayload)]);
+    A.w.__zapitSend([makeFile(A.w, 'relay.bin', relayPayload)]);
     await waitFor(() => {
       const r = rowNamed(B.w, 'relay.bin');
       return r && r.classList.contains('done');
