@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>zapit · admin</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚡%3C/text%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fef08a'/%3E%3Cstop offset='.5' stop-color='%236ee7ff'/%3E%3Cstop offset='1' stop-color='%23c084fc'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M38 2 L14 38 H26 L22 62 L50 26 H36 Z'/%3E%3C/svg%3E" />
 <style>
   :root {
     --bg: #0b0d10; --panel: #12161c; --panel2: #171c24; --line: #232b36;
@@ -63,6 +63,23 @@
   .ghostBtn { background: transparent; color: var(--muted); border: 1px solid var(--line); margin-top: 10px; font-weight: 500; }
   .ghostBtn:hover { color: var(--text); }
   .note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+  h1 .bolt { width: 24px; height: 32px; vertical-align: -8px; margin-right: 8px; overflow: visible; }
+  .bolt .spark { opacity: 0; transform-origin: center; transform-box: fill-box; }
+  @media (prefers-reduced-motion: no-preference) {
+    .bolt .bolt-body { transform-origin: 50% 60%; animation: boltPulse 2.6s ease-in-out infinite; }
+    .bolt .spark { animation: twinkle 2.6s ease-in-out infinite; }
+    .bolt .spark.s2 { animation-delay: .55s; }
+    .bolt .spark.s3 { animation-delay: 1.1s; }
+    .bolt .spark.s4 { animation-delay: 1.75s; }
+  }
+  @keyframes boltPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 3px rgba(110,231,255,.5)); }
+    50%      { transform: scale(1.08); filter: drop-shadow(0 0 12px rgba(124,157,255,.9)); }
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0; transform: scale(.4); }
+    50%      { opacity: 1; transform: scale(1.2); }
+  }
   .note code { background: #0d1117; border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: 11px; }
 </style>
 </head>
@@ -70,7 +87,7 @@
 <div class="card">
   <!-- login -->
   <div id="login">
-    <h1>⚡ zapit admin</h1>
+    <h1><svg class="bolt" viewBox="0 0 48 64" aria-hidden="true"><defs><linearGradient id="boltGradA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fef08a"/><stop offset=".35" stop-color="#6ee7ff"/><stop offset=".7" stop-color="#7c9dff"/><stop offset="1" stop-color="#c084fc"/></linearGradient><filter id="boltGlowA" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path class="bolt-body" filter="url(#boltGlowA)" fill="url(#boltGradA)" d="M30 2 L6 38 H18 L14 62 L42 26 H28 Z"/><circle class="spark s1" cx="7" cy="12" r="1.7" fill="#fef9c3"/><circle class="spark s2" cx="42" cy="10" r="1.4" fill="#6ee7ff"/><circle class="spark s3" cx="43" cy="44" r="1.6" fill="#f0abfc"/><circle class="spark s4" cx="4" cy="50" r="1.3" fill="#fef9c3"/></svg>zapit admin</h1>
     <div class="sub">Enter the admin password to manage the auth switch.</div>
     <label for="pw">Admin password</label>
     <input id="pw" type="password" placeholder="••••••••" autocomplete="current-password" />
@@ -81,7 +98,7 @@
 
   <!-- panel -->
   <div id="panel" class="hidden">
-    <h1>⚡ zapit admin</h1>
+    <h1><svg class="bolt" viewBox="0 0 48 64" aria-hidden="true"><defs><linearGradient id="boltGradB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fef08a"/><stop offset=".35" stop-color="#6ee7ff"/><stop offset=".7" stop-color="#7c9dff"/><stop offset="1" stop-color="#c084fc"/></linearGradient><filter id="boltGlowB" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path class="bolt-body" filter="url(#boltGlowB)" fill="url(#boltGradB)" d="M30 2 L6 38 H18 L14 62 L42 26 H28 Z"/><circle class="spark s1" cx="7" cy="12" r="1.7" fill="#fef9c3"/><circle class="spark s2" cx="42" cy="10" r="1.4" fill="#6ee7ff"/><circle class="spark s3" cx="43" cy="44" r="1.6" fill="#f0abfc"/><circle class="spark s4" cx="4" cy="50" r="1.3" fill="#fef9c3"/></svg>zapit admin</h1>
     <div class="sub">Control whether login is required to pair devices.</div>
 
     <div class="switchrow">
