@@ -1,8 +1,8 @@
 services:
-  droppy:
+  zapit:
     build: .
-    image: droppy:local
-    container_name: droppy
+    image: zapit:local
+    container_name: zapit
     ports:
       - "5150:5150"
     environment:
@@ -12,19 +12,22 @@ services:
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
       # Authentik SSO (optional — configure then flip the switch in /admin)
       AUTHENTIK_BASE_URL: "${AUTHENTIK_BASE_URL:-}"
-      AUTHENTIK_SLUG: "${AUTHENTIK_SLUG:-droppy}"
+      AUTHENTIK_SLUG: "${AUTHENTIK_SLUG:-zapit}"
       AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
       AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
       AUTHENTIK_SCOPES: "${AUTHENTIK_SCOPES:-openid profile email}"
       # canonical public origin: QR codes + OIDC redirect URIs use this when set
-      # (e.g. https://droppy.innotel.us behind a reverse proxy)
+      # (e.g. https://zapit.innotel.us behind a reverse proxy)
       PUBLIC_URL: "${PUBLIC_URL:-}"
+      # QR code customization: override the link address the QR code encodes
+      # (defaults to the canonical/LAN URL)
+      QR_URL: "${QR_URL:-}"
       AUTH_ENABLED: "${AUTH_ENABLED:-false}"
     volumes:
       # named volume: owned by the container's node user automatically.
       # Prefer a bind mount instead? Use ./data:/data and run: chown 1000:1000 ./data
-      - droppy-data:/data
+      - zapit-data:/data
     restart: unless-stopped
 
 volumes:
-  droppy-data:
+  zapit-data:

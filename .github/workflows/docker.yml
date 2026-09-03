@@ -1,6 +1,6 @@
 name: docker
 
-# Builds, tests, and publishes the droppy image to GHCR.
+# Builds, tests, and publishes the zapit image to GHCR.
 #
 # Image: ghcr.io/<owner>/<repo> (lowercased automatically)
 #   - push to main   → :main + :sha-<short>
@@ -8,7 +8,7 @@ name: docker
 #   - pull requests  → build + tests only, no push
 #
 # The first push creates the package as PRIVATE. To allow anonymous `docker pull`,
-# flip it to public: repo → Packages → droppy → Package settings.
+# flip it to public: repo → Packages → zapit → Package settings.
 
 on:
   push:
@@ -37,18 +37,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: droppy/package-lock.json
+          cache-dependency-path: zapit/package-lock.json
 
       - name: Install dependencies
-        working-directory: droppy
+        working-directory: zapit
         run: npm ci --no-fund --no-audit
 
       - name: Protocol suite (server API, relay, admin, kill-switch)
-        working-directory: droppy
+        working-directory: zapit
         run: node test/smoke.js
 
       - name: Browser simulation (real UI, two jsdom tabs, p2p + zip)
-        working-directory: droppy
+        working-directory: zapit
         run: node test/browser-sim.js
 
   build:
@@ -92,7 +92,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v7
         with:
-          context: droppy
+          context: zapit
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}

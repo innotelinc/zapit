@@ -1,58 +1,63 @@
-# Production deployment for https://droppy.innotel.us
+# Production deployment for https://zapit.innotel.us
 # Reverse proxy: Nginx Proxy Manager (NPM) — this compose does NOT publish ports
 # or terminate TLS; your existing NPM instance owns 80/443.
 #
 # 1. Copy .env.example to .env next to this file and set at minimum:
 #      ADMIN_PASSWORD=<secret>
 #      AUTHENTIK_BASE_URL=https://<your-authentik-host>
-#      AUTHENTIK_CLIENT_ID=droppy
+#      AUTHENTIK_CLIENT_ID=zapit
 #      NPM_NETWORK=<the docker network your NPM container uses>  (see below)
 #
 #    Find the network:  docker inspect <npm-container> --format '{{range $k,$_ := .NetworkSettings.Networks}}{{$k}} {{end}}'
 #    (commonly "npm_default" or a manually created "proxy" network)
 #
-# 2. Point DNS for droppy.innotel.us at the host running NPM.
+# 2. Point DNS for zapit.innotel.us at the host running NPM.
 #
 # 3. Bring it up:
 #      docker compose -f docker-compose.prod.yml up -d
 #
 # 4. In NPM: Hosts → Proxy Hosts → Add Proxy Host
-#      Domain:        droppy.innotel.us
+#      Domain:        zapit.innotel.us
 #      Scheme:        http
-#      Forward Host:  droppy        (this compose's container name)
+#      Forward Host:  zapit       (this compose's container name)
 #      Port:          5150
 #      ✅ Websockets Support        (required — transfers ride WebSockets)
 #      ✅ Block Common Exploits
 #      SSL tab: Request a new Let's Encrypt certificate, Force SSL, HTTP/2
 #
-# 5. Apply the Authentik blueprint once: open https://droppy.innotel.us/admin →
+# 5. Apply the Authentik blueprint once: open https://zapit.innotel.us/admin →
 #    "Download blueprint YAML" → paste into Authentik (Customize → Blueprints → Create),
-#    or mount authentik/blueprint.yaml into the authentik worker as /blueprints/droppy.yaml.
-#    client_id must match AUTHENTIK_CLIENT_ID (blueprint default: droppy).
+#    or mount authentik/blueprint.yaml into the authentik worker as /blueprints/zapit.yaml.
+#    client_id must match AUTHENTIK_CLIENT_ID (blueprint default: zapit).
 #
 # 6. Flip "Require Authentik login" in /admin when ready.
 #
-# Note: pulling ghcr.io/innotelinc/droppy requires the GHCR package to be public
-# (repo → Packages → droppy → Package settings) or a `docker login ghcr.io` with a
+# QR code customization: set QR_URL in .env to change the link address the QR
+# code encodes (defaults to PUBLIC_URL, or the LAN URL when unset).
+#
+# Note: pulling ghcr.io/innotelinc/zapit requires the GHCR package to be public
+# (repo → Packages → zapit → Package settings) or a `docker login ghcr.io` with a
 # package-scoped token.
 
 services:
-  droppy:
-    image: ghcr.io/innotelinc/droppy:latest
-    container_name: droppy
+  zapit:
+    image: ghcr.io/innotelinc/zapit:latest
+    container_name: zapit
     restart: unless-stopped
     environment:
       PORT: "5150"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}"
-      PUBLIC_URL: "https://droppy.innotel.us"
+      PUBLIC_URL: "https://zapit.innotel.us"
       AUTHENTIK_BASE_URL: "${AUTHENTIK_BASE_URL:-}"
-      AUTHENTIK_SLUG: "${AUTHENTIK_SLUG:-droppy}"
+      AUTHENTIK_SLUG: "${AUTHENTIK_SLUG:-zapit}"
       AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
       AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
       AUTHENTIK_SCOPES: "${AUTHENTIK_SCOPES:-openid profile email}"
+      # QR code customization: override the link address the QR code encodes
+      QR_URL: "${QR_URL:-}"
       AUTH_ENABLED: "${AUTH_ENABLED:-false}"
     volumes:
-      - droppy-data:/data
+      - zapit-data:/data
     networks:
       - npm-proxy
     healthcheck:
@@ -70,4 +75,4 @@ networks:
     name: "${NPM_NETWORK:?set NPM_NETWORK in .env}"
 
 volumes:
-  droppy-data:
+  zapit-data:
