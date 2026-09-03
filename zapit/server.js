@@ -34,7 +34,7 @@ const envBool = (v, dflt) => (v === undefined || v === '' ? dflt : /^(1|true|yes
 const envStr = (v) => (v === undefined || String(v).trim() === '' ? undefined : String(v).trim());
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const DATA_DIR = process.env.ZAPIT_DATA_DIR || process.env.DROPPY_DATA_DIR || path.join(__dirname, 'data');
+const DATA_DIR = process.env.ZAPIT_DATA_DIR || path.join(__dirname, 'data');
 const STATE_PATH = path.join(DATA_DIR, 'state.json');
 const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
 
@@ -42,7 +42,6 @@ const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
 const AUTHENTIK_BASE_URL = envStr(process.env.AUTHENTIK_BASE_URL); // e.g. https://authentik.example.com (or http://host:9000)
 const AUTHENTIK_SLUG = envStr(process.env.AUTHENTIK_SLUG) || 'zapit';
 const AUTHENTIK_CLIENT_ID = envStr(process.env.AUTHENTIK_CLIENT_ID);
-const AUTHENTIK_CLIENT_SECRET = envStr(process.env.AUTHENTIK_CLIENT_SECRET) || '';
 const AUTHENTIK_SCOPES = envStr(process.env.AUTHENTIK_SCOPES) || 'openid profile email';
 // Canonical public origin (e.g. https://zapit.innotel.us). When set it overrides the
 // per-request Host for QR/LAN URLs, OIDC redirect URIs and blueprint generation.
@@ -50,6 +49,22 @@ const PUBLIC_URL = envStr(process.env.PUBLIC_URL) ? envStr(process.env.PUBLIC_UR
 // QR code customization: QR_URL overrides the address the QR code encodes (and the
 // caption link) without touching LAN/PUBLIC_URL behavior. Defaults to the LAN/self URL.
 const QR_URL = envStr(process.env.QR_URL) || null;
+/* -------- SecretOps (Infisical) -----------------------------------------
+ * ADMIN_PASSWORD / AUTHENTIK_CLIENT_SECRET may be `infisical://<name>`
+ * references (docs/stack.md). Resolution is synchronous (boot-time, via a
+ * child node process) so the admin-password hash below is computed from the
+ * resolved value; plain values are mirrored into Infisical on boot so .env
+ * can switch to references after the first run.
+ */
+const infisical = require('./infisical');
+const infisicalCfg = infisical.configFromEnv();
+const ADMIN_PASSWORD = infisicalCfg.enabled
+  ? infisical.resolveRefSync(infisicalCfg, envStr(process.env.ADMIN_PASSWORD))
+  : envStr(process.env.ADMIN_PASSWORD);
+const AUTHENTIK_CLIENT_SECRET = infisicalCfg.enabled
+  ? infisical.resolveRefSync(infisicalCfg, envStr(process.env.AUTHENTIK_CLIENT_SECRET) || '')
+  : envStr(process.env.AUTHENTIK_CLIENT_SECRET) || '';
+
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 h
 const COOKIE_NAME = 'zapit_sid';
 
@@ -57,7 +72,7 @@ const COOKIE_NAME = 'zapit_sid';
 
 const state = {
   authEnabled: envBool(process.env.AUTH_ENABLED, false), // kill-switch (persisted)
-  adminPasswordHash: envStr(process.env.ADMIN_PASSWORD) ? sha256(envStr(process.env.ADMIN_PASSWORD)) : null,
+  adminPasswordHash: ADMIN_PASSWORD ? sha256(ADMIN_PASSWORD) : null,
   sessionTtlMs: SESSION_TTL_MS,
   oidc: AUTHENTIK_BASE_URL && AUTHENTIK_CLIENT_ID
     ? {
@@ -661,6 +676,17 @@ server.on('upgrade', (req, socket, head) => {
   }
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
 });
+
+// Mirror plain secret values into Infisical (best-effort, after listen).
+if (infisicalCfg.enabled) {
+  infisical
+    .mirror(infisicalCfg, { ADMIN_PASSWORD, AUTHENTIK_CLIENT_SECRET })
+    .then(({ written, errs }) => {
+      if (written.length) console.log(`         ▸  mirrored into Infisical: ${written.join(', ')}`);
+      for (const e of errs) console.error(`         ▸  infisical mirror failed: ${e.message}`);
+    })
+    .catch(() => {});
+}
 
 server.listen(PORT, HOST, () => {
   const shown = HOST === '0.0.0.0' ? '0.0.0.0 (all interfaces)' : HOST;

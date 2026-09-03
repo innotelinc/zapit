@@ -136,7 +136,7 @@ standard `openid`/`profile`/`email` scope mappings, and whitelists
 | `PUBLIC_URL` | *(unset)* | Canonical public origin (e.g. `https://zapit.innotel.us`) — overrides QR/LAN URLs and pins the OIDC redirect URI |
 | `QR_URL` | *(unset)* | **QR customization** — link address the QR code encodes (defaults to `PUBLIC_URL` or the LAN URL) |
 | `AUTH_ENABLED` | `false` | Initial kill-switch state (persisted afterwards) |
-| `ZAPIT_DATA_DIR` | `./data` | Where `state.json` / `config.json` live (`DROPPY_DATA_DIR` still honored for compatibility) |
+| `ZAPIT_DATA_DIR` | `./data` | Where `state.json` / `config.json` live |
 
 ## Docker
 
