@@ -66,6 +66,26 @@ when Authentik isn't configured is rejected (that would lock everyone out).
 
 ## Authentik setup
 
+### One-click blueprint (recommended)
+
+droppy can generate a ready-made **authentik blueprint** that creates the OAuth2 provider
+and application for you — no manual provider clicking:
+
+1. Set `PUBLIC_URL=https://droppy.innotel.us` (and `AUTHENTIK_CLIENT_ID`) on droppy, then
+   open `/admin` → **⬇ Download blueprint YAML** (or `GET /api/authentik/blueprint`).
+2. Import it into Authentik either way:
+   - **UI:** *Customize → Blueprints → Create* and paste the YAML, or
+   - **GitOps:** mount it into the authentik container as `/blueprints/droppy.yaml`
+     (a static copy with extra redirect URIs lives in [`authentik/blueprint.yaml`](authentik/blueprint.yaml)).
+3. Make sure droppy's `AUTHENTIK_CLIENT_ID` matches the blueprint's `client_id`
+   (`DROPPY_CLIENT_ID` env on authentik, default `droppy`), then flip the switch in `/admin`.
+
+The blueprint wires the provider as a **public PKCE client** (no secret), attaches the
+standard `openid`/`profile`/`email` scope mappings, and whitelists
+`https://droppy.innotel.us/api/auth/callback` as the redirect URI.
+
+### Manual setup
+
 1. In Authentik: **Applications → Providers → Create** an *OAuth2/OpenID Connect* provider.
 2. Set the **redirect URI** to `https://your-droppy-host/api/auth/callback`
    (use `http://...:5150/api/auth/callback` for plain LAN).
@@ -77,6 +97,7 @@ when Authentik isn't configured is rejected (that would lock everyone out).
    AUTHENTIK_CLIENT_ID=your_client_id
    # AUTHENTIK_CLIENT_SECRET=...        # only for confidential clients
    # AUTHENTIK_SLUG=droppy              # provider/application slug, default: droppy
+   # PUBLIC_URL=https://droppy.innotel.us  # canonical public origin (QR + redirect URI)
    ```
 
 5. Restart, flip the switch in `/admin`. A "Sign in with Authentik" button appears in the UI,
@@ -94,6 +115,7 @@ when Authentik isn't configured is rejected (that would lock everyone out).
 | `AUTHENTIK_CLIENT_ID` | *(unset)* | OIDC client id |
 | `AUTHENTIK_CLIENT_SECRET` | *(empty)* | Only for confidential clients |
 | `AUTHENTIK_SCOPES` | `openid profile email` | Requested scopes |
+| `PUBLIC_URL` | *(unset)* | Canonical public origin (e.g. `https://droppy.innotel.us`) — overrides QR/LAN URLs and pins the OIDC redirect URI |
 | `AUTH_ENABLED` | `false` | Initial kill-switch state (persisted afterwards) |
 | `DROPPY_DATA_DIR` | `./data` | Where `state.json` / `config.json` live |
 

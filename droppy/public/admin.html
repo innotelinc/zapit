@@ -60,6 +60,10 @@
   .kv b { color: var(--text); font-weight: 600; }
   a { color: var(--accent); text-decoration: none; }
   .hidden { display: none !important; }
+  .ghostBtn { background: transparent; color: var(--muted); border: 1px solid var(--line); margin-top: 10px; font-weight: 500; }
+  .ghostBtn:hover { color: var(--text); }
+  .note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+  .note code { background: #0d1117; border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -93,6 +97,22 @@
 
     <div class="kv" id="oidcInfo"></div>
     <div id="panelMsg" class="msg"></div>
+
+    <!-- authentik one-click setup -->
+    <div class="switchrow">
+      <div>
+        <div class="t">Authentik blueprint</div>
+        <div class="d">One-click provider setup — creates the OAuth2 app in your Authentik instance.</div>
+      </div>
+    </div>
+    <button id="dlBlueprint" class="ghostBtn">⬇ Download blueprint YAML</button>
+    <button id="copyBlueprint" class="ghostBtn">⧉ Copy blueprint YAML</button>
+    <div class="note">
+      Paste into Authentik under <b>Customize → Blueprints → Create</b>, or mount it as
+      <code>/blueprints/droppy.yaml</code>. Requires <code>PUBLIC_URL</code> on droppy
+      (it defines the redirect URI) and <code>AUTHENTIK_CLIENT_ID</code> to match the
+      generated <code>client_id</code>.
+    </div>
 
     <button id="logoutBtn" class="ghost" style="background:transparent;color:var(--muted);border:1px solid var(--line)">Lock admin panel</button>
   </div>
@@ -178,6 +198,30 @@
   $('loginBtn').onclick = login;
   $('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
   $('logoutBtn').onclick = () => { token = ''; sessionStorage.removeItem('droppy_admin'); $('panel').classList.add('hidden'); $('login').classList.remove('hidden'); };
+
+  // authentik blueprint: download / copy
+  async function blueprintText() {
+    const r = await fetch('/api/authentik/blueprint');
+    if (!r.ok) throw new Error(((await r.json()).error) || `HTTP ${r.status}`);
+    return r.text();
+  }
+  $('dlBlueprint').onclick = async () => {
+    try {
+      const text = await blueprintText();
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/yaml' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = 'droppy-authentik.yaml';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) { $('panelMsg').textContent = e.message; $('panelMsg').className = 'msg err'; }
+  };
+  $('copyBlueprint').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(await blueprintText());
+      $('panelMsg').textContent = 'Blueprint copied — paste it into Authentik.';
+      $('panelMsg').className = 'msg ok';
+    } catch (e) { $('panelMsg').textContent = e.message; $('panelMsg').className = 'msg err'; }
+  };
 
   if (token) showPanel();
 })();

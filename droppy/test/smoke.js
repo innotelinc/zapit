@@ -37,6 +37,16 @@ function get(p, headers = {}) {
     }).on('error', reject);
   });
 }
+// like get() but against an arbitrary local port (used for second server instances)
+function get2(port, p, headers = {}) {
+  return new Promise((resolve, reject) => {
+    http.get(`http://127.0.0.1:${port}${p}`, { headers }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
+    }).on('error', reject);
+  });
+}
 function post(p, body, headers = {}) {
   return new Promise((resolve, reject) => {
     const data = Buffer.isBuffer(body) ? body : Buffer.from(JSON.stringify(body));
@@ -101,6 +111,7 @@ async function main() {
       HOST: '127.0.0.1',
       DROPPY_DATA_DIR: dataDir,
       ADMIN_PASSWORD: 'test-admin-pw',
+      PUBLIC_URL: 'https://droppy.example.test',
       // fake provider config: only needs to exist so the auth toggle is permitted
       AUTHENTIK_BASE_URL: 'http://127.0.0.1:9',
       AUTHENTIK_CLIENT_ID: 'droppy-test-client',
@@ -127,6 +138,41 @@ async function main() {
     const lan = await get('/api/lan');
     const lanJ = JSON.parse(lan.body);
     ok('GET /api/lan includes QR data URL', lan.status === 200 && lanJ.qr.startsWith('data:image/png;base64,'));
+    ok('/api/lan uses PUBLIC_URL for QR/self', lanJ.selfUrl === 'https://droppy.example.test' && lanJ.addresses[0].url === 'https://droppy.example.test');
+
+    console.log('▶ authentik blueprint generator');
+    const bpRes = await get('/api/authentik/blueprint');
+    const bpText = bpRes.body.toString('utf8');
+    let bp = null;
+    try {
+      // authentik blueprints use custom YAML tags (!Find, !KeyOf, !Env) — strip them so
+      // the doc loads with a plain parser; tag payloads remain as strings for assertions
+      const stripped = bpText.replace(/(^|\s)!([A-Za-z][\w.-]*)/g, '$1');
+      bp = require('js-yaml').load(stripped);
+    } catch {}
+    ok('blueprint returns valid YAML', bpRes.status === 200 && !!bp);
+    ok('blueprint creates OAuth2 provider + application',
+      bp && bp.entries && bp.entries.length === 2 &&
+      bp.entries[0].model === 'authentik_providers_oauth2.oauth2provider' &&
+      bp.entries[1].model === 'authentik_core.application');
+    ok('blueprint provider is public/PKCE client with expected client_id',
+      bp && bp.entries[0].attrs.client_type === 'public' && bp.entries[0].attrs.client_id === 'droppy-test-client');
+    ok('blueprint redirect URI derives from PUBLIC_URL',
+      bp && bp.entries[0].attrs.redirect_uris[0].url === 'https://droppy.example.test/api/auth/callback');
+    ok('blueprint links application via !KeyOf',
+      bp && bp.entries[1].attrs.provider === 'droppy-provider' && bp.entries[0].id === 'droppy-provider');
+    try {
+      // second server run: no PUBLIC_URL → endpoint must refuse
+      const server2 = spawn(process.execPath, [path.join(ROOT, 'server.js')], {
+        env: { ...process.env, PORT: String(PORT + 1), HOST: '127.0.0.1', DROPPY_DATA_DIR: dataDir, ADMIN_PASSWORD: 'x' },
+        stdio: 'ignore',
+      });
+      let up = false;
+      for (let i = 0; i < 50; i++) { try { await get2(PORT + 1, '/healthz'); up = true; break; } catch { await sleep(100); } }
+      const noBp = await get2(PORT + 1, '/api/authentik/blueprint');
+      ok('blueprint endpoint refuses without PUBLIC_URL (400)', up && noBp.status === 400);
+      server2.kill('SIGTERM');
+    } catch (e) { ok('blueprint endpoint refuses without PUBLIC_URL (400)', false, e.message); }
 
     console.log('▶ websocket room pairing');
     const a = await wsClient();
