@@ -133,6 +133,15 @@ async function main() {
     ok('GET / serves index', idx.status === 200 && idx.body.includes('zapit'));
     const admin = await get('/admin');
     ok('GET /admin serves admin page', admin.status === 200 && admin.body.includes('admin'));
+    const manifest = await get('/manifest.webmanifest');
+    const manifestJ = JSON.parse(manifest.body);
+    ok('GET /manifest.webmanifest serves install metadata',
+      manifest.status === 200 && manifest.headers['content-type'].includes('application/manifest+json') &&
+      manifestJ.display === 'standalone' && manifestJ.start_url === '/');
+    const sw = await get('/sw.js');
+    ok('GET /sw.js serves the app shell worker',
+      sw.status === 200 && sw.headers['content-type'].includes('text/javascript') && sw.body.includes("zapit-shell-v1"));
+    ok('index links the installable app manifest', idx.body.includes('rel="manifest"'));
     const cfg = await get('/api/config');
     ok('GET /api/config', cfg.status === 200 && JSON.parse(cfg.body).authEnabled === false);
     const lan = await get('/api/lan');

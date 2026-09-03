@@ -28,6 +28,15 @@ npm start
 On your phone: open the LAN URL printed at startup (or scan the QR on the page), enter the
 same room code, and drop files both ways.
 
+## Install on your phone
+
+ZapIt is an installable progressive web app. Over HTTPS, Android browsers can show the
+**Install** button in the header; the browser menu also offers **Install app** or **Add to
+Home screen**. On iPhone, open the URL in Safari and use **Share → Add to Home Screen**.
+The installed app opens in a standalone window and keeps the same room-link sharing,
+WebRTC, and relay transfer behavior. Plain LAN HTTP remains usable for transfers, but
+browsers may hide the install prompt and clipboard features until HTTPS is enabled.
+
 ## How transfers work
 
 Devices join a **room** (an ephemeral ID you invent, e.g. `zap-421`). On pairing, the devices
@@ -88,7 +97,7 @@ when Authentik isn't configured is rejected (that would lock everyone out).
 zapit can generate a ready-made **authentik blueprint** that creates the OAuth2 provider
 and application for you — no manual provider clicking:
 
-1. Set `PUBLIC_URL=https://zapit.innotel.us` (and `AUTHENTIK_CLIENT_ID`) on zapit, then
+1. Set `PUBLIC_URL=https://zapp.innotel.us` (and `AUTHENTIK_CLIENT_ID`) on zapit, then
    open `/admin` → **⬇ Download blueprint YAML** (or `GET /api/authentik/blueprint`).
 2. Import it into Authentik either way:
    - **UI:** *Customize → Blueprints → Create* and paste the YAML, or
@@ -99,7 +108,7 @@ and application for you — no manual provider clicking:
 
 The blueprint wires the provider as a **public PKCE client** (no secret), attaches the
 standard `openid`/`profile`/`email` scope mappings, and whitelists
-`https://zapit.innotel.us/api/auth/callback` as the redirect URI.
+`https://zapp.innotel.us/api/auth/callback` as the redirect URI.
 
 ### Manual setup
 
@@ -114,7 +123,7 @@ standard `openid`/`profile`/`email` scope mappings, and whitelists
    AUTHENTIK_CLIENT_ID=your_client_id
    # AUTHENTIK_CLIENT_SECRET=...        # only for confidential clients
    # AUTHENTIK_SLUG=zapit               # provider/application slug, default: zapit
-   # PUBLIC_URL=https://zapit.innotel.us  # canonical public origin (QR + redirect URI)
+   # PUBLIC_URL=https://zapp.innotel.us  # canonical public origin (QR + redirect URI)
    # QR_URL=https://join.example.org    # optional: custom link address for the QR code
    ```
 
@@ -133,7 +142,7 @@ standard `openid`/`profile`/`email` scope mappings, and whitelists
 | `AUTHENTIK_CLIENT_ID` | *(unset)* | OIDC client id |
 | `AUTHENTIK_CLIENT_SECRET` | *(empty)* | Only for confidential clients |
 | `AUTHENTIK_SCOPES` | `openid profile email` | Requested scopes |
-| `PUBLIC_URL` | *(unset)* | Canonical public origin (e.g. `https://zapit.innotel.us`) — overrides QR/LAN URLs and pins the OIDC redirect URI |
+| `PUBLIC_URL` | *(unset)* | Canonical public origin (e.g. `https://zapp.innotel.us`) — overrides QR/LAN URLs and pins the OIDC redirect URI |
 | `QR_URL` | *(unset)* | **QR customization** — link address the QR code encodes (defaults to `PUBLIC_URL` or the LAN URL) |
 | `AUTH_ENABLED` | `false` | Initial kill-switch state (persisted afterwards) |
 | `ZAPIT_DATA_DIR` | `./data` | Where `state.json` / `config.json` live |

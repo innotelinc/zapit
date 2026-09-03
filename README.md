@@ -20,8 +20,8 @@ files. They stream **device-to-device over WebRTC** when possible, with an autom
 
 zapit is the ecosystem's **TransferOps** edge utility — ephemeral, peer-to-peer file
 transfer with no storage layer. Files never touch a server's disk: the room code is
-the password, codes auto-expire, and everything vanishes when the tab closes. Try the
-[public instance](https://zapit.innotel.us), or browse the
+the password, codes auto-expire, and everything vanishes when the tab closes. Open the
+[ZapIt app](https://zapp.innotel.us), or browse the
 [landing page](https://innotelinc.github.io/zapit/) for the full picture.
 
 ## ✨ Highlights
@@ -32,6 +32,7 @@ the password, codes auto-expire, and everything vanishes when the tab closes. Tr
 - **Multi-file & folder drops arrive as one ZIP**, assembled in the browser (zero deps)
 - **Zings** — text snippets, links, code, anything — zapped alongside files
 - **Optional Authentik SSO** (OIDC + PKCE) with an admin kill-switch to flip login on/off
+- **Installable phone app (PWA)** — add ZapIt to an iPhone or Android home screen, with room-link sharing
 - **Customizable QR code** of your LAN address for one-scan phone pairing — point it at any
   link address with `QR_URL`
 - Single Node process, two runtime dependencies, ~zero config
@@ -61,7 +62,7 @@ Full documentation — Authentik setup, env vars, the admin panel, CI, and tests
 ## 📚 Documentation
 
 - [`zapit/README.md`](zapit/README.md) — full app documentation (Authentik, env, admin, CI, tests)
-- [`deploy/README.md`](deploy/README.md) — production deployment (`zapit.innotel.us`)
+- [`deploy/README.md`](deploy/README.md) — production deployment (`zapit.innotel.us` + `zapp.innotel.us`)
 - [`docs/stack.md`](docs/stack.md) — platform role in the Innotel Platform Stack (TransferOps)
 
 ## 🏛️ Platform stack
@@ -76,8 +77,9 @@ storage (ONYX), identity (Authentik), or billing (Magnate). See
 
 ## Public instance
 
-A public deployment runs at **[https://zapit.innotel.us](https://zapit.innotel.us)** —
-scan its QR from your phone and start zapping.
+The landing page runs at **[https://zapit.innotel.us](https://zapit.innotel.us)** and the
+transfer app runs at **[https://zapp.innotel.us](https://zapp.innotel.us)**. Open the app
+from your phone and start zapping.
 
 ## Repository layout
 

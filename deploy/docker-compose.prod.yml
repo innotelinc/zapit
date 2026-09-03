@@ -1,52 +1,52 @@
-# Production deployment for https://zapit.innotel.us
+# Production deployment for:
+#   * landing: https://zapit.innotel.us
+#   * app:     https://zapp.innotel.us
 #
-# Topology (matches the live setup):
-#   * zapit runs on its OWN host (the "app host", e.g. the nas at 192.168.1.10)
-#     and PUBLISHES port 5150 on that host's LAN address.
-#   * Nginx Proxy Manager (NPM) runs on a DIFFERENT host (e.g. 192.168.1.71),
-#     owns ports 80/443 + TLS, and proxies zapit.innotel.us over the LAN to
-#     <app-host>:5150. No shared docker network — the boxes are separate.
+# This stack runs both services on the same Docker host. Nginx Proxy Manager
+# (NPM) can run on this host or another host and routes by hostname:
+#   * zapit.innotel.us -> <app-host>:8080 (landing, WebSockets off)
+#   * zapp.innotel.us  -> <app-host>:5150 (ZapIt, WebSockets on)
+# NPM owns public ports 80/443 and TLS; these are internal app-host ports.
 #
 # 1. On the APP host: copy .env.example to .env next to this file and set:
 #      ADMIN_PASSWORD=<secret>
 #      (Authentik vars only if you use SSO — see README)
 #
-# 2. DNS: zapit.innotel.us must resolve to the NPM host (wildcard *.innotel.us
-#    already covers it in the innotel setup).
+# 2. DNS: both zapit.innotel.us and zapp.innotel.us must resolve to the NPM host.
+#    A wildcard *.innotel.us record already covers both in the innotel setup.
 #
-# 3. On the APP host, bring it up:
+# 3. On the APP host, bring up both services:
 #      docker compose -f docker-compose.prod.yml up -d
 #
-# 4. On the NPM host (UI at http://<npm-host>:81) add a proxy host:
-#      Domain:        zapit.innotel.us
-#      Scheme:        http
-#      Forward Host:  <app-host LAN IP>   (e.g. 192.168.1.10 — NOT a container name)
-#      Forward Port:  5150
-#      ✅ Websockets Support        (required — transfers ride WebSockets)
-#      ✅ Block Common Exploits
-#      SSL tab: Request a new Let's Encrypt certificate · Force SSL · HTTP/2
-#    Or via the NPM API: POST /api/nginx/proxy-hosts with the same fields.
+# 4. On the NPM host (UI at http://<npm-host>:81) add two proxy hosts:
+#      Landing: Domain zapit.innotel.us, Scheme http, Forward Host <app-host LAN IP>, Port 8080
+#      App:     Domain zapp.innotel.us, Scheme http, Forward Host <app-host LAN IP>, Port 5150
+#      Enable Websockets Support only for the app proxy host.
+#      Enable Block Common Exploits and request Let's Encrypt certificates for both.
 #
 # 5. Apply the Authentik blueprint once (only if you use SSO): open
-#    https://zapit.innotel.us/admin → "Download blueprint YAML" → paste into
-#    Authentik (Customize → Blueprints → Create), or mount
-#    zapit/authentik/blueprint.yaml into the authentik worker as
-#    /blueprints/zapit.yaml. client_id must match AUTHENTIK_CLIENT_ID
-#    (blueprint default: zapit).
+#    https://zapp.innotel.us/admin -> Download blueprint YAML -> paste into Authentik.
 #
-# 6. Flip "Require Authentik login" in /admin when ready.
-#
-# QR code customization: set QR_URL in .env to change the link address the QR
-# code encodes (defaults to PUBLIC_URL, or the LAN URL when unset). The live
-# deployment uses QR_URL=https://zapit.innotel.us/?room=zap-421.
-#
-# Note: pulling ghcr.io/innotelinc/zapit requires the GHCR package to be public
-# (repo → Packages → zapit → Package settings) or a `docker login ghcr.io` with a
-# package-scoped token.
 
 services:
+  landing:
+    build:
+      context: ../web/landing
+    image: zapit-landing:local
+    container_name: zapit-landing
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   zapit:
-    image: ghcr.io/innotelinc/zapit:1.2.1
+    build:
+      context: ../zapit
+    image: zapit:local
     container_name: zapit
     restart: unless-stopped
     ports:
@@ -55,14 +55,15 @@ services:
     environment:
       PORT: "5150"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}"
-      PUBLIC_URL: "https://zapit.innotel.us"
+      PUBLIC_URL: "https://zapp.innotel.us"
       AUTHENTIK_BASE_URL: "${AUTHENTIK_BASE_URL:-}"
       AUTHENTIK_SLUG: "${AUTHENTIK_SLUG:-zapit}"
       AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
       AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
       AUTHENTIK_SCOPES: "${AUTHENTIK_SCOPES:-openid profile email}"
       # QR code customization: override the link address the QR code encodes
-      QR_URL: "${QR_URL:-}"
+      # (defaults to the canonical app URL)
+      QR_URL: "${QR_URL:-https://zapp.innotel.us}"
       AUTH_ENABLED: "${AUTH_ENABLED:-false}"
     volumes:
       - zapit-data:/data

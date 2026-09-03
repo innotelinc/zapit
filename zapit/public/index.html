@@ -4,8 +4,14 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0d10" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="ZapIt" />
 <title>ZapIt · zap files between devices</title>
+<link rel="manifest" href="/manifest.webmanifest" />
 <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<link rel="apple-touch-icon" href="/icon.svg" />
 <meta property="og:title" content="ZAPIT ⚡ zap files between devices" />
 <meta property="og:description" content="Zero-login, P2P file zapping with zings. Open the same URL, type the room code, drop files." />
 <meta property="og:image" content="/icon.svg" />
@@ -34,6 +40,7 @@
   }
   .wrap { max-width: 760px; margin: 0 auto; padding: 28px 18px 60px; }
   header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 26px; }
+  .header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
   .logo { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 20px; letter-spacing: .3px; }
   .logo .bolt { width: 32px; height: 42px; overflow: visible; flex: none; }
   .logo .spark { opacity: 0; transform-origin: center; transform-box: fill-box; }
@@ -130,6 +137,10 @@
   button.ghost:hover { color: var(--text); border-color: #334052; }
   button.small { padding: 7px 12px; font-size: 13px; border-radius: 8px; }
   button:disabled { opacity: .5; cursor: not-allowed; }
+  button.touch { min-height: 44px; }
+  .app-action { display: none; }
+  .app-action.visible { display: inline-flex; align-items: center; gap: 6px; }
+  .app-action .icon { font-size: 16px; line-height: 1; }
 
   #qr { width: 128px; height: 128px; border-radius: 12px; cursor: zoom-in; image-rendering: pixelated; display: block; }
   .qrbox { text-align: center; }
@@ -222,6 +233,27 @@
   footer { text-align: center; color: #55606e; font-size: 12px; margin-top: 30px; }
   footer a { color: inherit; }
   .hidden { display: none !important; }
+  @media (max-width: 560px) {
+    body { padding-bottom: env(safe-area-inset-bottom); }
+    .wrap { padding: calc(16px + env(safe-area-inset-top)) 14px 32px; }
+    header { align-items: flex-start; margin-bottom: 18px; }
+    .header-actions { gap: 6px; }
+    .logo { gap: 8px; }
+    .logo .bolt { width: 26px; height: 36px; }
+    .logo .wordmark { font-size: 18px; letter-spacing: .18em; }
+    .badge { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    .card { padding: 17px; margin-bottom: 14px; }
+    #drop { padding: 34px 14px; min-height: 174px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .roomcode { gap: 7px; }
+    .roomcode input { flex-basis: 100%; font-size: 22px; }
+    .roomcode button { flex: 1; min-height: 44px; }
+    .batchbar { align-items: stretch; flex-direction: column; }
+    .batchbar button { width: 100%; }
+    .t .top { align-items: flex-start; flex-direction: column; gap: 2px; }
+    .t .meta { white-space: normal; }
+    .t .acts button { min-height: 40px; }
+    textarea { min-height: 112px; font-size: 16px; }
+  }
 </style>
 </head>
 <body>
@@ -250,7 +282,11 @@
       </svg>
       <span class="wordmark">zapit</span>
     </div>
-    <div id="authBadge" class="badge hidden"></div>
+    <div class="header-actions">
+      <button id="shareBtn" class="small ghost app-action touch" type="button" title="Share this room link"><span class="icon" aria-hidden="true">↗</span> Share</button>
+      <button id="installBtn" class="small ghost app-action touch" type="button" title="Install ZapIt on this phone"><span class="icon" aria-hidden="true">＋</span> Install</button>
+      <div id="authBadge" class="badge hidden"></div>
+    </div>
   </header>
 
   <div class="card">
@@ -896,6 +932,53 @@
   };
 
   /* ============ controls & boot ============ */
+  let installPrompt = null;
+  const installBtn = $('installBtn');
+  const shareBtn = $('shareBtn');
+
+  function roomShareUrl() {
+    const selected = roomEl.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 24);
+    const shareUrl = new URL(location.href);
+    shareUrl.search = selected ? `?room=${encodeURIComponent(selected)}` : '';
+    shareUrl.hash = '';
+    return shareUrl.toString();
+  }
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    installPrompt = event;
+    installBtn.classList.add('visible');
+  });
+  window.addEventListener('appinstalled', () => {
+    installPrompt = null;
+    installBtn.classList.remove('visible');
+    toast('ZapIt installed on this phone');
+  });
+  installBtn.onclick = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      await installPrompt.userChoice.catch(() => {});
+      installPrompt = null;
+      installBtn.classList.remove('visible');
+      return;
+    }
+    toast('Use your browser menu and choose “Add to Home Screen”');
+  };
+  shareBtn.onclick = async () => {
+    const url = roomShareUrl();
+    const shareData = { title: 'ZapIt room', text: 'Join my ZapIt room', url };
+    try {
+      if (navigator.share) await navigator.share(shareData);
+      else throw new Error('share unavailable');
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+      try { await navigator.clipboard.writeText(url); toast('Room link copied'); }
+      catch { toast(url); }
+    }
+  };
+  if (navigator.share || navigator.clipboard) shareBtn.classList.add('visible');
+  if ('serviceWorker' in navigator && !IS_SIM) navigator.serviceWorker.register('/sw.js').catch(() => {});
+
   $('randBtn').onclick = () => { roomEl.value = randomCode(); connect(); };
   $('joinBtn').onclick = () => connect();
   $('rotateBtn').onclick = () => { roomEl.value = randomCode(); connect(); toast('Fresh room code — share it again'); };
