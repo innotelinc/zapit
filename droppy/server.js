@@ -44,6 +44,9 @@ const AUTHENTIK_SLUG = envStr(process.env.AUTHENTIK_SLUG) || 'droppy';
 const AUTHENTIK_CLIENT_ID = envStr(process.env.AUTHENTIK_CLIENT_ID);
 const AUTHENTIK_CLIENT_SECRET = envStr(process.env.AUTHENTIK_CLIENT_SECRET) || '';
 const AUTHENTIK_SCOPES = envStr(process.env.AUTHENTIK_SCOPES) || 'openid profile email';
+// Canonical public origin (e.g. https://droppy.innotel.us). When set it overrides the
+// per-request Host for QR/LAN URLs, OIDC redirect URIs and blueprint generation.
+const PUBLIC_URL = envStr(process.env.PUBLIC_URL) ? envStr(process.env.PUBLIC_URL).replace(/\/+$/, '') : null;
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 h
 const COOKIE_NAME = 'droppy_sid';
 
@@ -262,6 +265,56 @@ async function oidcToken(tokenUrl, body) {
   return res.json();
 }
 
+/* ------------------------------------------------- authentik blueprint */
+
+// Generates an authentik blueprint that creates the OAuth2 provider (public/PKCE client)
+// and application for droppy in one shot. Structure mirrors authentik's own blueprints
+// (blueprints/testing/oidc-conformance.yaml): !Find flow lookups, !KeyOf app→provider link,
+// object-form redirect_uris (authentik 2024.2+).
+function blueprintYaml({ slug, clientId, redirectUri }) {
+  return `# Authentik blueprint for droppy — creates the provider + application in one click.
+#
+# Apply it either way:
+#   * mount into the authentik container as /blueprints/droppy.yaml (auto-applied), or
+#   * paste the YAML under Customize → Blueprints → Create.
+#
+# Then configure droppy:
+#   AUTHENTIK_BASE_URL=<your authentik URL>
+#   AUTHENTIK_CLIENT_ID=${clientId}
+#   PUBLIC_URL=${redirectUri.replace('/api/auth/callback', '')}
+version: 1
+metadata:
+  name: droppy
+entries:
+  - identifiers:
+      slug: ${slug}
+    model: authentik_providers_oauth2.oauth2provider
+    id: droppy-provider
+    attrs:
+      name: droppy
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      client_type: public
+      client_id: ${clientId}
+      redirect_uris:
+        - matching_mode: strict
+          url: ${redirectUri}
+          redirect_uri_type: authorization
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
+  - identifiers:
+      slug: ${slug}
+    model: authentik_core.application
+    id: droppy-application
+    attrs:
+      name: droppy
+      slug: ${slug}
+      provider: !KeyOf droppy-provider
+`;
+}
+
 /* ------------------------------------------------------------ admin auth */
 
 function requireAdmin(req, res) {
@@ -313,10 +366,12 @@ const server = http.createServer(async (req, res) => {
       if (oidcAuthRequests.size > 200) {
         for (const [k, v] of oidcAuthRequests) if (v.exp < Date.now()) oidcAuthRequests.delete(k);
       }
-      const redirectUri = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}/api/auth/callback`;
+      // PUBLIC_URL (when set) wins over the request Host so the redirect matches the
+      // origin whitelisted on the Authentik provider, even behind different proxies.
+      const redirectUri = `${PUBLIC_URL || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}`}/api/auth/callback`;
       const authUrl = new URL(u.auth);
       authUrl.searchParams.set('client_id', state.oidc.clientId);
-      authUrl.searchParams.set('redirect_uri', actualRedirectUri);
+      authUrl.searchParams.set('redirect_uri', redirectUri);
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('scope', state.oidc.scopes);
       authUrl.searchParams.set('state', st);
@@ -338,7 +393,7 @@ const server = http.createServer(async (req, res) => {
       const body = {
         grant_type: 'authorization_code',
         code,
-        redirect_uri: `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}/api/auth/callback`,
+        redirect_uri: `${PUBLIC_URL || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}`}/api/auth/callback`,
         client_id: state.oidc.clientId,
         code_verifier: entry.verifier,
       };
@@ -407,11 +462,21 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/lan' && req.method === 'GET') {
       const proto = String(req.headers['x-forwarded-proto'] || 'http');
       const host = String(req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`);
-      const selfUrl = `${proto}://${host}`;
-      const addrs = lanAddresses(PORT);
+      const selfUrl = PUBLIC_URL || `${proto}://${host}`;
+      const addrs = PUBLIC_URL ? [{ name: 'public', address: PUBLIC_URL, url: PUBLIC_URL }] : lanAddresses(PORT);
       const qrData = addrs.length ? addrs[0].url : selfUrl;
       const qr = await QRCode.toDataURL(qrData, { margin: 1, width: 360, color: { dark: '#0b0d10', light: '#ffffff' } });
       return send(res, 200, { selfUrl, addresses: addrs, qr, port: PORT });
+    }
+
+    if (p === '/api/authentik/blueprint' && req.method === 'GET') {
+      if (!PUBLIC_URL) {
+        return send(res, 400, { error: 'PUBLIC_URL is not set — it defines the redirect URI origin (e.g. PUBLIC_URL=https://droppy.innotel.us)' });
+      }
+      const slug = (state.oidc && state.oidc.slug) || AUTHENTIK_SLUG || 'droppy';
+      const clientId = (state.oidc && state.oidc.clientId) || AUTHENTIK_CLIENT_ID || 'droppy';
+      const yaml = blueprintYaml({ slug, clientId, redirectUri: `${PUBLIC_URL}/api/auth/callback` });
+      return send(res, 200, yaml, { 'Content-Type': 'application/yaml; charset=utf-8', 'Content-Disposition': 'attachment; filename="droppy-authentik.yaml"' });
     }
 
     /* ---- static ---- */

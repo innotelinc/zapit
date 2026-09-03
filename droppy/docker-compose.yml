@@ -16,6 +16,9 @@ services:
       AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
       AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
       AUTHENTIK_SCOPES: "${AUTHENTIK_SCOPES:-openid profile email}"
+      # canonical public origin: QR codes + OIDC redirect URIs use this when set
+      # (e.g. https://droppy.innotel.us behind a reverse proxy)
+      PUBLIC_URL: "${PUBLIC_URL:-}"
       AUTH_ENABLED: "${AUTH_ENABLED:-false}"
     volumes:
       # named volume: owned by the container's node user automatically.

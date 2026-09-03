@@ -18,6 +18,13 @@ fallback, so it works on your LAN and across the internet.
 - Single Node process, two runtime dependencies, ~zero config
 - **Docker-ready** — non-root image, healthcheck, multi-arch builds published to GHCR by CI
   (tests gate every build: protocol suite + a browser simulation driving the real UI)
+- **One-click Authentik blueprint** — droppy generates the provider YAML for you at
+  `/api/authentik/blueprint`, or mount the static one in `authentik/blueprint.yaml`
+
+## Public instance
+
+A public deployment runs at **[https://droppy.innotel.us](https://droppy.innotel.us)** —
+scan its QR from your phone and start zapping.
 
 ## Quick start
 
@@ -53,3 +60,7 @@ Author and maintainer of droppy. Building small, sharp tools that respect privac
 no accounts, no tracking, files that go directly from device to device and vanish when
 the tab closes. If you find droppy useful, contributions and bug reports are welcome —
 open an issue or a PR.
+
+## License
+
+[MIT](LICENSE) © Darnel Hunter
