@@ -12,7 +12,7 @@ fallback, so it works on your LAN and across the internet.
 - **Peer-to-peer** via WebRTC data channels (files never touch the server's disk)
 - **Relay fallback** through the server when NATs/UDP block direct paths
 - **Multi-file & folder drops arrive as one ZIP**, assembled in the browser (zero deps)
-- **Text snippets** shared alongside files
+- **Zings** — text snippets, links, code, anything — zapped alongside files
 - **Optional Authentik SSO** (OIDC + PKCE) with an admin kill-switch to flip login on/off
 - **Customizable QR code** of your LAN address for one-scan phone pairing — point it at any
   link address with `QR_URL`
