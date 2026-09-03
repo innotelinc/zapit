@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0d10" />
 <title>ZapIt · zap files between devices</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fef08a'/%3E%3Cstop offset='.5' stop-color='%236ee7ff'/%3E%3Cstop offset='1' stop-color='%23c084fc'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M38 2 L14 38 H26 L22 62 L50 26 H36 Z'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fef3c7'/%3E%3Cstop offset='.5' stop-color='%23fbbf24'/%3E%3Cstop offset='1' stop-color='%23b45309'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M38 2 L14 38 H26 L22 62 L50 26 H36 Z'/%3E%3C/svg%3E" />
 <style>
   :root {
     --bg: #0b0d10; --panel: #12161c; --panel2: #171c24; --line: #232b36;
@@ -26,9 +26,16 @@
   }
   .wrap { max-width: 760px; margin: 0 auto; padding: 28px 18px 60px; }
   header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 26px; }
-  .logo { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 20px; letter-spacing: .3px; }
-  .logo .bolt { width: 30px; height: 40px; overflow: visible; flex: none; }
+  .logo { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 20px; letter-spacing: .3px; }
+  .logo .bolt { width: 32px; height: 42px; overflow: visible; flex: none; }
   .logo .spark { opacity: 0; transform-origin: center; transform-box: fill-box; }
+  .logo .wordmark {
+    font-weight: 800; font-size: 21px; letter-spacing: .24em; text-transform: uppercase;
+    background: linear-gradient(90deg, #fef3c7, #fbbf24, #f59e0b, #fff7cc, #fbbf24);
+    background-size: 250% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 6px rgba(251,191,36,.35));
+  }
   @media (prefers-reduced-motion: no-preference) {
     .logo .bolt-body {
       transform-origin: 50% 60%;
@@ -39,21 +46,22 @@
     .logo .spark.s3 { animation-delay: 1.1s; }
     .logo .spark.s4 { animation-delay: 1.75s; }
     .logo .wordmark {
-      background: linear-gradient(90deg, #6ee7ff, #7c9dff, #c084fc, #f0abfc, #6ee7ff);
-      background-size: 250% 100%;
-      -webkit-background-clip: text; background-clip: text; color: transparent;
-      animation: shimmer 4.5s linear infinite;
+      animation: shimmer 4.5s linear infinite, wordGlow 2.6s ease-in-out infinite;
     }
   }
   @keyframes boltPulse {
-    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(110,231,255,.55)); }
-    50%      { transform: scale(1.07); filter: drop-shadow(0 0 16px rgba(124,157,255,.95)); }
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(251,191,36,.55)); }
+    50%      { transform: scale(1.08); filter: drop-shadow(0 0 18px rgba(245,158,11,.95)); }
   }
   @keyframes twinkle {
     0%, 100% { opacity: 0; transform: scale(.4); }
     50%      { opacity: 1; transform: scale(1.2); }
   }
   @keyframes shimmer { to { background-position: -250% 0; } }
+  @keyframes wordGlow {
+    0%, 100% { filter: drop-shadow(0 0 4px rgba(251,191,36,.25)); }
+    50%      { filter: drop-shadow(0 0 12px rgba(245,158,11,.6)); }
+  }
   .badge { font-size: 12px; color: var(--muted); border: 1px solid var(--line); padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
   .badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
   .badge a { color: inherit; text-decoration: none; font-weight: 600; }
@@ -173,21 +181,22 @@
       <svg class="bolt" viewBox="0 0 48 64" aria-hidden="true">
         <defs>
           <linearGradient id="boltGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#fef08a"/>
-            <stop offset=".35" stop-color="#6ee7ff"/>
-            <stop offset=".7" stop-color="#7c9dff"/>
-            <stop offset="1" stop-color="#c084fc"/>
+            <stop offset="0" stop-color="#fffbeb"/>
+            <stop offset=".3" stop-color="#fde047"/>
+            <stop offset=".55" stop-color="#fbbf24"/>
+            <stop offset=".8" stop-color="#f59e0b"/>
+            <stop offset="1" stop-color="#b45309"/>
           </linearGradient>
           <filter id="boltGlow" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur stdDeviation="2.2" result="b"/>
+            <feGaussianBlur stdDeviation="2.4" result="b"/>
             <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
         </defs>
-        <path class="bolt-body" filter="url(#boltGlow)" fill="url(#boltGrad)" d="M30 2 L6 38 H18 L14 62 L42 26 H28 Z"/>
-        <circle class="spark s1" cx="7"  cy="12" r="1.7" fill="#fef9c3"/>
-        <circle class="spark s2" cx="42" cy="10" r="1.4" fill="#6ee7ff"/>
-        <circle class="spark s3" cx="43" cy="44" r="1.6" fill="#f0abfc"/>
-        <circle class="spark s4" cx="4"  cy="50" r="1.3" fill="#fef9c3"/>
+        <path class="bolt-body" filter="url(#boltGlow)" fill="url(#boltGrad)" d="M32 2 L4 40 H17 L12 62 L44 24 H29 Z"/>
+        <path class="spark s1" d="M7 6 l3 5 -2.5 1 3 5" stroke="#fde047" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <path class="spark s2" d="M42 8 l-3 5 2.5 1 -3 5" stroke="#fbbf24" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+        <path class="spark s3" d="M43 42 l-3 4 2.5 1.5 -3 4" stroke="#f59e0b" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <path class="spark s4" d="M4 48 l3 4 -2.5 1.5 3 4" stroke="#fef3c7" stroke-width="1.4" fill="none" stroke-linecap="round"/>
       </svg>
       <span class="wordmark">zapit</span>
     </div>
