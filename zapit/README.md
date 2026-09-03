@@ -10,7 +10,7 @@ Open the same URL on both devices (or scan the QR), type the same room code, dro
 - **Room codes auto-expire** — 15 min after pairing (paused while devices are connected),
   the code rotates automatically; rotate manually anytime with **↻ New code**
 - **Customizable QR code** — point the QR at any link address with `QR_URL`
-- **Text snippets** shared alongside files
+- **Zings** — a zing is a thing: text, links, code, whatever — zapped alongside files
 - **Optional Authentik SSO** (OIDC + PKCE) with a **flip of a switch** in the admin panel
 - **Admin password** required to flip that switch (and to lock the panel)
 - Single Node process, two tiny dependencies (`ws`, `qrcode`), ~zero config
@@ -211,7 +211,7 @@ the kill-switch toggle, and its persistence.
 The browser simulation is the interesting one: it loads the **actual `index.html` UI** into
 two jsdom "tabs" connected to a real server, with `RTCPeerConnection` swapped for a local
 implementation with identical semantics. It then verifies: p2p negotiation, byte-identical
-p2p transfer, multi-file drop → single ZIP (magic bytes + payload checked), text zap,
+p2p transfer, multi-file drop → single ZIP (magic bytes + payload checked), zing zap,
 relay-mode fallback with byte verification, and room auto-rotation after the peer leaves.
 Network transports are the only shimmed piece — chunking, backpressure, ZIP building, and
 all UI logic run for real.

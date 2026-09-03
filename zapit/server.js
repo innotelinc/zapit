@@ -606,10 +606,10 @@ wss.on('connection', (ws, req) => {
         for (const peer of roomPeers(ws.zapitRoom, ws)) wsSend(peer, done);
         break;
       }
-      case 'text': {
+      case 'zing': {
         if (!ws.zapitRoom) break;
         const t = String(msg.text || '').slice(0, 100_000);
-        for (const peer of roomPeers(ws.zapitRoom, ws)) wsSend(peer, { type: 'text', text: t, from: nextConnId(ws) });
+        for (const peer of roomPeers(ws.zapitRoom, ws)) wsSend(peer, { type: 'zing', text: t, from: nextConnId(ws) });
         break;
       }
       case 'leave': {

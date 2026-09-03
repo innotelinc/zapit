@@ -700,7 +700,7 @@
         case 'file-done':
           finishEntry(m.from, m.tid);
           break;
-        case 'text':
+        case 'zing':
           $('txtIn').value = m.text;
           toast('Zing received from a paired device');
           break;
@@ -800,12 +800,12 @@
     ws.send(JSON.stringify({ type: 'answer', to: Number(fromId), payload: p.pc.localDescription }));
   }
 
-  /* ============ text zap ============ */
+  /* ============ zing zap ============ */
   $('sendTxt').onclick = () => {
     const t = $('txtOut').value.trim();
     if (!t) return;
     if (!joined) { toast('Pair a room first'); return; }
-    ws.send(JSON.stringify({ type: 'text', text: t }));
+    ws.send(JSON.stringify({ type: 'zing', text: t }));
     toast('Zing zapped ⚡');
   };
   $('copyTxt').onclick = async () => {
