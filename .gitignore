@@ -1,0 +1,12 @@
+# keep the workspace root a sane repo root
+node_modules/
+data/
+*.log
+.env
+.DS_Store
+
+# unrelated toolchain downloads
+go1.*.tar.gz*
+
+# unrelated local project (not part of droppy) — remove this line to track it
+compose/

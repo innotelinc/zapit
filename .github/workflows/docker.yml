@@ -1,0 +1,109 @@
+name: docker
+
+# Builds, tests, and publishes the droppy image to GHCR.
+#
+# Image: ghcr.io/<owner>/<repo> (lowercased automatically)
+#   - push to main   → :main + :sha-<short>
+#   - tag v1.2.3     → :1.2.3, :1.2, :1, :latest (rolling)
+#   - pull requests  → build + tests only, no push
+#
+# The first push creates the package as PRIVATE. To allow anonymous `docker pull`,
+# flip it to public: repo → Packages → droppy → Package settings.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  # docker/metadata-action lowercases the image name for us
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: droppy/package-lock.json
+
+      - name: Install dependencies
+        working-directory: droppy
+        run: npm ci --no-fund --no-audit
+
+      - name: Protocol suite (server API, relay, admin, kill-switch)
+        working-directory: droppy
+        run: node test/smoke.js
+
+      - name: Browser simulation (real UI, two jsdom tabs, p2p + zip)
+        working-directory: droppy
+        run: node test/browser-sim.js
+
+  build:
+    name: build & push
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up QEMU (arm64 builds)
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=ref,event=branch
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: droppy
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image digest
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "Published:"
+          echo "${{ steps.meta.outputs.tags }}" | tr ' ' '\n' | sed 's/^/  - /'
+          echo "Digest: ${{ steps.build.outputs.digest }}"

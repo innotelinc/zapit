@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>droppy · admin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚡%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #0b0d10; --panel: #12161c; --panel2: #171c24; --line: #232b36;
+    --text: #e8edf4; --muted: #8b96a5; --accent: #6ee7ff; --accent2: #7c9dff;
+    --ok: #4ade80; --err: #f87171; --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(900px 500px at 80% -10%, rgba(124,157,255,.10), transparent 60%), var(--bg);
+    color: var(--text); display: flex; align-items: center; justify-content: center; padding: 24px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .card {
+    width: 100%; max-width: 460px;
+    background: linear-gradient(180deg, var(--panel), var(--panel2));
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 26px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
+  label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 14px 0 6px; }
+  input {
+    width: 100%; background: #0d1117; color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; width: 100%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #081018;
+    border: none; border-radius: 10px; padding: 12px 18px; margin-top: 16px;
+  }
+  button:hover { filter: brightness(1.08); }
+  .switchrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); margin-top: 18px; }
+  .switchrow .t { font-weight: 600; }
+  .switchrow .d { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .switch { position: relative; width: 52px; height: 28px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .slider {
+    position: absolute; inset: 0; background: #232b36; border-radius: 999px; cursor: pointer; transition: .2s;
+    border: 1px solid var(--line);
+  }
+  .slider:before {
+    content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px;
+    background: #8b96a5; border-radius: 50%; transition: .2s;
+  }
+  .switch input:checked + .slider { background: rgba(74,222,128,.2); border-color: rgba(74,222,128,.5); }
+  .switch input:checked + .slider:before { transform: translateX(24px); background: var(--ok); }
+  .msg { margin-top: 14px; font-size: 13px; min-height: 18px; }
+  .msg.err { color: var(--err); }
+  .msg.ok { color: var(--ok); }
+  .kv { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.7; }
+  .kv b { color: var(--text); font-weight: 600; }
+  a { color: var(--accent); text-decoration: none; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="card">
+  <!-- login -->
+  <div id="login">
+    <h1>⚡ droppy admin</h1>
+    <div class="sub">Enter the admin password to manage the auth switch.</div>
+    <label for="pw">Admin password</label>
+    <input id="pw" type="password" placeholder="••••••••" autocomplete="current-password" />
+    <button id="loginBtn">Unlock</button>
+    <div id="loginMsg" class="msg"></div>
+    <div class="sub" style="margin-top:18px">Set it via the <b>ADMIN_PASSWORD</b> env var (or <b>droppy/data/config.json</b> → <b>adminPasswordHash</b>).</div>
+  </div>
+
+  <!-- panel -->
+  <div id="panel" class="hidden">
+    <h1>⚡ droppy admin</h1>
+    <div class="sub">Control whether login is required to pair devices.</div>
+
+    <div class="switchrow">
+      <div>
+        <div class="t">Require Authentik login</div>
+        <div class="d" id="swDesc">Loading…</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="authSwitch" />
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="kv" id="oidcInfo"></div>
+    <div id="panelMsg" class="msg"></div>
+
+    <button id="logoutBtn" class="ghost" style="background:transparent;color:var(--muted);border:1px solid var(--line)">Lock admin panel</button>
+  </div>
+  <div style="text-align:center;margin-top:18px"><a href="/">← back to droppy</a></div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  let token = sessionStorage.getItem('droppy_admin') || '';
+
+  const authHeaders = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` });
+
+  async function login() {
+    const pw = $('pw').value;
+    if (!pw) return;
+    $('loginMsg').textContent = ''; $('loginMsg').className = 'msg';
+    try {
+      const r = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      const j = await r.json();
+      if (!r.ok) { $('loginMsg').textContent = j.error || 'Login failed'; $('loginMsg').className = 'msg err'; return; }
+      token = j.token;
+      sessionStorage.setItem('droppy_admin', token);
+      $('pw').value = '';
+      showPanel();
+    } catch (e) {
+      $('loginMsg').textContent = 'Network error: ' + e.message;
+      $('loginMsg').className = 'msg err';
+    }
+  }
+
+  async function showPanel() {
+    const r = await fetch('/api/admin/state', { headers: authHeaders() });
+    if (r.status === 401 || r.status === 403 || r.status === 409) {
+      token = ''; sessionStorage.removeItem('droppy_admin');
+      $('panel').classList.add('hidden'); $('login').classList.remove('hidden');
+      if (r.status === 409) { $('loginMsg').textContent = (await r.json()).error; }
+      return;
+    }
+    const s = await r.json();
+    $('login').classList.add('hidden');
+    $('panel').classList.remove('hidden');
+    $('authSwitch').checked = s.authEnabled;
+    $('swDesc').textContent = s.authEnabled
+      ? 'ON — devices must sign in with Authentik before pairing.'
+      : 'OFF — anyone with the link/room code can pair. Kill-switch active.';
+    $('oidcInfo').innerHTML = s.oidc
+      ? `Authentik: <b>${s.oidc.baseUrl}</b><br/>Provider app slug: <b>${s.oidc.slug}</b> · client: <b>${s.oidc.clientId}</b>${s.oidc.hasSecret ? ' (with secret)' : ' (public/PKCE)'}`
+      : '⚠️ Authentik is <b>not configured</b>. Set <b>AUTHENTIK_BASE_URL</b> and <b>AUTHENTIK_CLIENT_ID</b> to enable SSO.';
+  }
+
+  $('authSwitch').onchange = async () => {
+    const on = $('authSwitch').checked;
+    $('authSwitch').disabled = true;
+    $('panelMsg').textContent = ''; $('panelMsg').className = 'msg';
+    try {
+      const r = await fetch('/api/admin/auth-toggle', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ authEnabled: on }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || r.status);
+      const j = await r.json();
+      $('swDesc').textContent = j.authEnabled
+        ? 'ON — devices must sign in with Authentik before pairing.'
+        : 'OFF — anyone with the link/room code can pair. Kill-switch active.';
+      $('panelMsg').textContent = j.authEnabled ? 'Login is now required.' : 'Login requirement disabled — open access.';
+      $('panelMsg').className = 'msg ok';
+    } catch (e) {
+      $('authSwitch').checked = !on; // revert
+      $('panelMsg').textContent = 'Failed: ' + e.message;
+      $('panelMsg').className = 'msg err';
+    } finally {
+      $('authSwitch').disabled = false;
+    }
+  };
+
+  $('loginBtn').onclick = login;
+  $('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+  $('logoutBtn').onclick = () => { token = ''; sessionStorage.removeItem('droppy_admin'); $('panel').classList.add('hidden'); $('login').classList.remove('hidden'); };
+
+  if (token) showPanel();
+})();
+</script>
+</body>
+</html>
