@@ -94,4 +94,4 @@ docker compose -f docker-compose.prod.yml up -d
 ```
 
 CI re-pushes `:latest` on every commit to `main`; pin
-`ghcr.io/innotelinc/zapit:1.1.0` instead if you want fixed versions.
+`ghcr.io/innotelinc/zapit:1.2.0` instead if you want fixed versions.
