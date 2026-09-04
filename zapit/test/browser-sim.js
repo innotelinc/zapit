@@ -121,7 +121,8 @@ class RPCShim {
 
 /* ------------- jsdom tab factory ------------- */
 
-function makeTab(name, room = 'simroom') {
+function makeTab(name, room = 'simroom', opts = {}) {
+  // opts: { ua: '...' , standalone: bool } — lets tests exercise iOS install paths
   const vc = new VirtualConsole();
   vc.on('error', (...a) => console.error(`[${name} console.error]`, ...a));
   vc.on('jsdomError', (e) => console.error(`[${name} jsdomError]`, e.message, e.detail && e.detail.stack ? `\n${e.detail.stack}` : ''));
@@ -134,7 +135,12 @@ function makeTab(name, room = 'simroom') {
       window.zapitSim = true; // IS_SIM: small chunks, fast room expiry
       window.fetch = (input, init) => fetch(String(input).startsWith('http') ? input : `${BASE}${input}`, init);
       // jsdom provides a real origin-scoped localStorage — no shim needed
-      Object.defineProperty(window.navigator, 'userAgent', { value: `Mozilla/5.0 ${name} TestBrowser/1.0`, configurable: true });
+      Object.defineProperty(window.navigator, 'userAgent', {
+        value: opts.ua || `Mozilla/5.0 ${name} TestBrowser/1.0`, configurable: true,
+      });
+      if (opts.standalone) {
+        try { Object.defineProperty(window.navigator, 'standalone', { value: true, configurable: true }); } catch {}
+      }
       window.__sockets = [];
       window.WebSocket = class {
         constructor(url) {
@@ -299,6 +305,59 @@ const rowNamed = (w, name) => rows(w).find((r) => r.querySelector('.name').textC
       return v && v !== 'simroom';
     }, 8000, 'room code rotated');
     ok('room code auto-rotated when idle', true);
+
+    console.log('▶ leave room (explicit disconnect)');
+    const C = makeTab('C', 'leaveroom');
+    const D = makeTab('D', 'leaveroom');
+    await sleep(250);
+    await waitFor(() => C.w.document.getElementById('statusText').textContent.includes('paired'), 5000, 'C paired');
+    await waitFor(() => D.w.document.getElementById('statusText').textContent.includes('paired'), 5000, 'D paired');
+    ok('leave-room tabs paired', true);
+    const dLeave = D.w.document.getElementById('leaveBtn');
+    ok('Leave button is visible while connected', !dLeave.classList.contains('hidden'));
+    dLeave.click();
+    await waitFor(() => D.w.document.getElementById('statusText').textContent.includes('Left the room'), 3000, 'D status flips to left');
+    ok('D disconnects and status confirms', true);
+    ok('Leave button hides after leaving', dLeave.classList.contains('hidden'));
+    ok('rotation controls reset after leaving',
+      D.w.document.getElementById('rotateBtn').classList.contains('hidden') &&
+      D.w.document.getElementById('expiry').textContent === '');
+    ok('room param dropped from the URL after leaving', !D.w.location.search.includes('room='));
+    await waitFor(() => C.w.document.getElementById('statusText').textContent.includes('alone'), 5000, 'C sees D leave');
+    ok('C sees peer leave after D disconnects', true);
+    // D rejoins a fresh room to prove pairing still works after a leave
+    C.w.document.getElementById('room').value = 'rejoinroom';
+    C.w.document.getElementById('joinBtn').click();
+    D.w.document.getElementById('room').value = 'rejoinroom';
+    D.w.document.getElementById('joinBtn').click();
+    await waitFor(() => {
+      const ct = C.w.document.getElementById('statusText').textContent;
+      const dt = D.w.document.getElementById('statusText').textContent;
+      return /paired/i.test(ct) && /paired/i.test(dt);
+    }, 8000, 'both rejoined a new room');
+    ok('D can rejoin a room after leaving', true);
+    ok('Leave button visible again after rejoining', !D.w.document.getElementById('leaveBtn').classList.contains('hidden'));
+    await sleep(500); // let pending p2p-open timers fire before the tabs close
+    C.dom.window.close(); D.dom.window.close();
+    await sleep(100);
+
+    console.log('▶ iOS install guidance (no beforeinstallprompt on iPhone)');
+    const iosUA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+    const iosTab = makeTab('iosSafari', 'iosroom', { ua: iosUA });
+    await sleep(250);
+    const iosInstall = iosTab.w.document.getElementById('installBtn');
+    ok('iPhone Safari shows the Install button', iosInstall.classList.contains('visible'));
+    iosInstall.click();
+    await waitFor(() => iosTab.w.document.getElementById('installModal').classList.contains('show'), 2000, 'install help modal');
+    ok('iPhone install tap opens the Add-to-Home-Screen guide', true);
+    iosTab.w.document.getElementById('installClose').click();
+    ok('install guide closes via its ✕', !iosTab.w.document.getElementById('installModal').classList.contains('show'));
+    iosTab.dom.window.close();
+    const installedTab = makeTab('iosStandalone', 'iosroom2', { ua: iosUA, standalone: true });
+    await sleep(250);
+    ok('iOS running standalone hides the Install button',
+      !installedTab.w.document.getElementById('installBtn').classList.contains('visible'));
+    installedTab.dom.window.close();
   } catch (e) {
     failed++;
     console.error('  ✘ unexpected failure:', e.stack || e.message);

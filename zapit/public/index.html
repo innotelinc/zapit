@@ -135,6 +135,8 @@
   button:active { transform: scale(.98); }
   button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
   button.ghost:hover { color: var(--text); border-color: #334052; }
+  button.ghost.danger { color: var(--err); border-color: rgba(248,113,113,.35); }
+  button.ghost.danger:hover { color: #fecaca; border-color: var(--err); box-shadow: 0 0 10px rgba(248,113,113,.25); }
   button.small { padding: 7px 12px; font-size: 13px; border-radius: 8px; }
   button:disabled { opacity: .5; cursor: not-allowed; }
   button.touch { min-height: 44px; }
@@ -230,6 +232,15 @@
   .modal { position: fixed; inset: 0; background: rgba(4,6,9,.8); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
   .modal.show { display: flex; }
   .modal img { max-width: min(80vw, 420px); border-radius: 16px; border: 2px solid rgba(251,191,36,.5); box-shadow: 0 0 26px rgba(217,119,6,.4); }
+  .modal .modal-card { position: relative; background: linear-gradient(180deg, #151a22, #0e1319); border: 1px solid var(--line); border-radius: 18px; padding: 26px 24px 22px; max-width: min(92vw, 360px); color: var(--text); box-shadow: 0 14px 44px rgba(0,0,0,.55); }
+  .modal .modal-card h3 { margin: 0 0 6px; font-size: 17px; color: var(--gold); letter-spacing: .02em; }
+  .modal .modal-card p.sub { margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+  .modal .modal-card .steps { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.65; }
+  .modal .modal-card .steps li { margin: 8px 0; }
+  .modal .modal-card .steps b { color: var(--text); }
+  .modal .modal-card .glyph { display: inline-flex; align-items: center; justify-content: center; vertical-align: -3px; width: 20px; height: 20px; border-radius: 5px; background: rgba(110,231,255,.12); border: 1px solid rgba(110,231,255,.35); font-size: 12px; color: var(--accent); }
+  .modal .modal-x { position: absolute; top: 10px; right: 12px; background: none; border: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 6px; line-height: 1; }
+  .modal .modal-x:hover { color: var(--text); }
   footer { text-align: center; color: #55606e; font-size: 12px; margin-top: 30px; }
   footer a { color: inherit; }
   .hidden { display: none !important; }
@@ -252,6 +263,7 @@
     .t .top { align-items: flex-start; flex-direction: column; gap: 2px; }
     .t .meta { white-space: normal; }
     .t .acts button { min-height: 40px; }
+    .row button { min-height: 40px; }
     textarea { min-height: 112px; font-size: 16px; }
   }
 </style>
@@ -303,6 +315,7 @@
         </div>
         <div class="row" style="margin-top:6px">
           <button id="rotateBtn" class="small ghost gold-ghost hidden">↻ New code</button>
+          <button id="leaveBtn" class="small ghost danger hidden" type="button" title="Disconnect from this room">✕ Leave room</button>
           <span class="badge" id="expiry" title="Room code rotates automatically when idle"></span>
         </div>
       </div>
@@ -366,6 +379,18 @@
 </div>
 
 <div class="modal" id="modal"><img id="modalImg" alt="QR code enlarged" /></div>
+<div class="modal" id="installModal" role="dialog" aria-modal="true" aria-labelledby="installTitle">
+  <div class="modal-card">
+    <button type="button" class="modal-x" id="installClose" aria-label="Close">✕</button>
+    <h3 id="installTitle">Install ZapIt on your iPhone</h3>
+    <p class="sub">Add it to your Home Screen so it opens like its own app:</p>
+    <ol class="steps">
+      <li>Tap the <b>Share</b> button <span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M7 9l5-5 5 5"/><path d="M4 20h16"/></svg></span> in Safari's toolbar.</li>
+      <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+      <li>Tap <b>Add</b> in the top-right, then open ZapIt from your Home Screen.</li>
+    </ol>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -749,6 +774,7 @@
     const r = roomEl.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 24);
     if (!r) { setStatus('Enter a room code first.', 'wait'); roomEl.focus(); return; }
     room.name = r;
+    $('leaveBtn').classList.remove('hidden');
     localStorage.setItem('zapit_room', r);
     refreshQr(); // QR now points at ?room=<code> so scans join directly
 
@@ -826,14 +852,33 @@
           break;
       }
     };
-    const myWs = ws; // ignore close events from sockets we already replaced
-    ws.onclose = () => {
-      if (ws !== myWs || !room.name) return;
-      joined = false;
-      setStatus('Disconnected — retrying…', 'wait');
-      setTimeout(() => { if (!joined && ws === myWs && room.name) connect(); }, 1500);
-    };
+  const myWs = ws; // ignore close events from sockets we already replaced
+  ws.onclose = () => {
+    if (ws !== myWs || !room.name) return;
+    joined = false;
+    setStatus('Disconnected — retrying…', 'wait');
+    setTimeout(() => { if (!joined && ws === myWs && room.name) connect(); }, 1500);
+  };
     ws.onerror = () => {};
+  }
+
+  /* ---- leave the room: disconnect and reset to the idle state ---- */
+  function leaveRoom() {
+    if (!room.name && !ws) return;
+    clearTimeout(room.timer);
+    if (room.tick) { clearInterval(room.tick); room.tick = null; }
+    for (const id of Object.keys(peers)) { teardownPeer(peers[id]); delete peers[id]; }
+    disconnectWS(); // closing the socket tells the server; other devices get peer-left
+    room.name = null; room.expiresAt = 0;
+    $('expiry').textContent = '';
+    $('rotateBtn').classList.add('hidden');
+    $('leaveBtn').classList.add('hidden');
+    setStatus('Left the room — enter a code to pair again', '');
+    const clean = new URL(location.href);
+    clean.searchParams.delete('room');
+    history.replaceState(null, '', clean.pathname + clean.search + clean.hash);
+    refreshQr(); // QR back to the bare app address
+    toast('Left the room');
   }
 
   function teardownPeer(p) {
@@ -933,9 +978,16 @@
   };
 
   /* ============ controls & boot ============ */
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS 13+ reports as a Mac
+  const inStandaloneApp = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ||
+    navigator.standalone === true;
   let installPrompt = null;
   const installBtn = $('installBtn');
   const shareBtn = $('shareBtn');
+  const installModal = $('installModal');
+  const showInstallHelp = () => installModal.classList.add('show');
+  const hideInstallHelp = () => installModal.classList.remove('show');
 
   function roomShareUrl() {
     const selected = sanitizeRoom(roomEl.value);
@@ -964,6 +1016,13 @@
   }
   function scheduleQr() { clearTimeout(qrTimer); qrTimer = setTimeout(refreshQr, 250); }
 
+  // iOS/iPadOS never fire beforeinstallprompt — the only install path is
+  // Safari's Share → Add to Home Screen, so surface the button and explain it.
+  if (isIOS && !inStandaloneApp) {
+    installBtn.classList.add('visible');
+    installBtn.title = 'Add ZapIt to your Home Screen';
+    installBtn.setAttribute('aria-label', 'Install ZapIt — see how to add it to your Home Screen');
+  }
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     installPrompt = event;
@@ -982,8 +1041,11 @@
       installBtn.classList.remove('visible');
       return;
     }
-    toast('Use your browser menu and choose “Add to Home Screen”');
+    if (isIOS) showInstallHelp();
+    else toast('Use your browser menu and choose “Add to Home Screen”');
   };
+  $('installClose').onclick = hideInstallHelp;
+  installModal.onclick = (e) => { if (e.target === installModal) hideInstallHelp(); };
   shareBtn.onclick = async () => {
     const url = roomShareUrl();
     const shareData = { title: 'ZapIt room', text: 'Join my ZapIt room', url };
@@ -1002,6 +1064,7 @@
   $('randBtn').onclick = () => { roomEl.value = randomCode(); connect(); };
   $('joinBtn').onclick = () => connect();
   $('rotateBtn').onclick = () => { roomEl.value = randomCode(); connect(); toast('Fresh room code — share it again'); };
+  $('leaveBtn').onclick = () => leaveRoom();
   roomEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(); });
   roomEl.addEventListener('input', () => { roomEl.value = roomEl.value.toUpperCase(); scheduleQr(); });
 

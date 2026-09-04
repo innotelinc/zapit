@@ -142,6 +142,8 @@ async function main() {
     ok('GET /sw.js serves the app shell worker',
       sw.status === 200 && sw.headers['content-type'].includes('text/javascript') && sw.body.includes("zapit-shell-v1"));
     ok('index links the installable app manifest', idx.body.includes('rel="manifest"'));
+    ok('index ships a Leave-room control', idx.body.includes('id="leaveBtn"'));
+    ok('index ships the iOS install guide modal', idx.body.includes('id="installModal"') && idx.body.includes('Add to Home Screen'));
     const cfg = await get('/api/config');
     ok('GET /api/config', cfg.status === 200 && JSON.parse(cfg.body).authEnabled === false);
     const lan = await get('/api/lan');
