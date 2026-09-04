@@ -150,6 +150,17 @@ async function main() {
     ok('/api/lan uses PUBLIC_URL for QR/self', lanJ.selfUrl === 'https://zapit.example.test' && lanJ.addresses[0].url === 'https://zapit.example.test');
     ok('/api/lan QR encodes PUBLIC_URL by default', lanJ.qrUrl === 'https://zapit.example.test');
 
+    console.log('▶ room-aware QR share target');
+    const lanRoom = await get('/api/lan?room=Zap-421!x');
+    const lanRoomJ = JSON.parse(lanRoom.body);
+    ok('GET /api/lan?room= bakes sanitized room into QR target',
+      lanRoom.status === 200 && lanRoomJ.qrUrl === 'https://zapit.example.test/?room=zap-421x');
+    ok('room QR is still a PNG data URL', lanRoomJ.qr.startsWith('data:image/png;base64,'));
+    ok('/api/lan echoes the sanitized room', lanRoomJ.room === 'zap-421x');
+    const lanRoomEmpty = await get('/api/lan?room=');
+    const lanRoomEmptyJ = JSON.parse(lanRoomEmpty.body);
+    ok('empty ?room= keeps the bare QR target', lanRoomEmptyJ.qrUrl === 'https://zapit.example.test' && lanRoomEmptyJ.room === null);
+
     console.log('▶ authentik blueprint generator');
     const bpRes = await get('/api/authentik/blueprint');
     const bpText = bpRes.body.toString('utf8');
@@ -193,6 +204,8 @@ async function main() {
       ok('QR_URL overrides the encoded address', up3 && lan3.qrUrl === 'https://join.example.org/pick-a-room');
       ok('QR_URL leaves selfUrl/addresses alone', up3 && lan3.selfUrl === 'https://zapit.example.test' && lan3.addresses[0].url === 'https://zapit.example.test');
       ok('QR image still a PNG data URL', up3 && lan3.qr.startsWith('data:image/png;base64,'));
+      const lanRoom3 = JSON.parse((await get2(PORT + 2, '/api/lan?room=spark-77')).body);
+      ok('room param appends to a QR_URL target', up3 && lanRoom3.qrUrl === 'https://join.example.org/pick-a-room?room=spark-77');
       server3.kill('SIGTERM');
     } catch (e) { ok('QR_URL override works', false, e.message); }
     try {
