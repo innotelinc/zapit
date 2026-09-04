@@ -1,5 +1,5 @@
 const CACHE_NAME = 'zapit-shell-v1';
-const APP_SHELL = ['/', '/manifest.webmanifest', '/icon.svg', '/logo.svg'];
+const APP_SHELL = ['/', '/manifest.webmanifest', '/icon.svg', '/icon-180.png', '/logo.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
