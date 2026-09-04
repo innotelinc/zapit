@@ -32,10 +32,12 @@ same room code, and drop files both ways.
 
 ZapIt is an installable progressive web app. Over HTTPS, Android browsers can show the
 **Install** button in the header; the browser menu also offers **Install app** or **Add to
-Home screen**. On iPhone, open the URL in Safari and use **Share → Add to Home Screen**.
-The installed app opens in a standalone window and keeps the same room-link sharing,
-WebRTC, and relay transfer behavior. Plain LAN HTTP remains usable for transfers, but
-browsers may hide the install prompt and clipboard features until HTTPS is enabled.
+Home screen**. On **iPhone/iPad**, Safari never shows an automatic prompt, so ZapIt keeps the
+header **Install** button visible and tapping it walks you through **Share → Add to Home
+Screen** (it hides itself once you're running from the Home Screen). The installed app opens
+in a standalone window and keeps the same room-link sharing, WebRTC, and relay transfer
+behavior. Plain LAN HTTP remains usable for transfers, but browsers may hide the install
+prompt and clipboard features until HTTPS is enabled.
 
 ## How transfers work
 
@@ -57,6 +59,9 @@ Room codes are capabilities, so they expire: **15 minutes** after pairing (or la
 The countdown shows next to the room field and **pauses while other devices are paired** —
 an active session never gets yanked mid-transfer. When idle, the code auto-rotates and the
 new code is shown; share it again. Prefer manual control? **↻ New code** rotates on demand.
+Done for the day? **✕ Leave room** disconnects you cleanly — peers are told you left, the
+countdown and rotation stop, the QR drops back to the bare app address, and you can pair a
+new code any time.
 
 ## QR code customization
 
