@@ -750,6 +750,7 @@
     if (!r) { setStatus('Enter a room code first.', 'wait'); roomEl.focus(); return; }
     room.name = r;
     localStorage.setItem('zapit_room', r);
+    refreshQr(); // QR now points at ?room=<code> so scans join directly
 
     disconnectWS();
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -937,12 +938,31 @@
   const shareBtn = $('shareBtn');
 
   function roomShareUrl() {
-    const selected = roomEl.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 24);
+    const selected = sanitizeRoom(roomEl.value);
     const shareUrl = new URL(location.href);
     shareUrl.search = selected ? `?room=${encodeURIComponent(selected)}` : '';
     shareUrl.hash = '';
     return shareUrl.toString();
   }
+
+  /* ============ room-aware QR ============ */
+  // The QR always encodes the joinable URL: bare address on load, then
+  // ?room=<code> as soon as a code is entered/paired, so a scan joins instantly.
+  const sanitizeRoom = (v) => v.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 24);
+  let qrTimer = null;
+  async function refreshQr() {
+    const r = sanitizeRoom(roomEl.value);
+    try {
+      const res = await fetch(`/api/lan${r ? `?room=${encodeURIComponent(r)}` : ''}`);
+      const lan = await res.json();
+      $('qr').src = lan.qr;
+      const qrAddr = lan.qrUrl || (lan.addresses.length ? lan.addresses[0].url : lan.selfUrl);
+      $('lanUrl').textContent = qrAddr;
+      $('qr').title = `Scan to open ${qrAddr}`;
+      $('qr').alt = `QR code encoding ${qrAddr}`;
+    } catch {}
+  }
+  function scheduleQr() { clearTimeout(qrTimer); qrTimer = setTimeout(refreshQr, 250); }
 
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
@@ -983,7 +1003,7 @@
   $('joinBtn').onclick = () => connect();
   $('rotateBtn').onclick = () => { roomEl.value = randomCode(); connect(); toast('Fresh room code — share it again'); };
   roomEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(); });
-  roomEl.addEventListener('input', () => { roomEl.value = roomEl.value.toUpperCase(); });
+  roomEl.addEventListener('input', () => { roomEl.value = roomEl.value.toUpperCase(); scheduleQr(); });
 
   async function boot() {
     try {
@@ -998,14 +1018,7 @@
         b.innerHTML = `<a href="/api/auth/start">Sign in with Authentik</a>`;
       }
     } catch {}
-    try {
-      const lan = await fetch('/api/lan').then((r) => r.json());
-      $('qr').src = lan.qr;
-      const qrAddr = lan.qrUrl || (lan.addresses.length ? lan.addresses[0].url : lan.selfUrl);
-      $('lanUrl').textContent = qrAddr;
-      $('qr').title = `Scan to open ${qrAddr}`;
-      $('qr').alt = `QR code encoding ${qrAddr}`;
-    } catch {}
+    refreshQr(); // room-aware: picks up any code already in the field (url/saved)
     $('qr').onclick = () => { $('modalImg').src = $('qr').src; $('modal').classList.add('show'); };
     $('modal').onclick = () => $('modal').classList.remove('show');
 
