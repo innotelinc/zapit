@@ -57,6 +57,14 @@ jobs:
           if [ -n "$base" ] && printf '%s' "$base" | grep -Eq '^0+$'; then
             base=""
           fi
+          # A force-pushed tag (or a push over rewritten history) can carry a
+          # "before" SHA that no longer resolves in this checkout — an invalid
+          # revision range would fail the range scan below even on clean
+          # history. Fall back to scanning the full reachable history.
+          if [ -n "$base" ] && ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "before SHA $base not reachable in this checkout — scanning full history"
+            base=""
+          fi
 
           # ── 1. Commit messages in the range ───────────────────────────
           if [ -n "$base" ] && [ -n "$head" ]; then
