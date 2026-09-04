@@ -36,9 +36,9 @@ Files in this directory:
    No `NPM_NETWORK` is needed — zapit is reached over the LAN, not a shared
    docker network.
 
-2. **DNS** — `zapit.innotel.us` must resolve to the **NPM host** (in the innotel
-   setup the wildcard `*.innotel.us` record already covers every subdomain, so
-   there is nothing to add).
+2. **DNS** — both `zapit.innotel.us` and `zapp.innotel.us` must resolve to the
+   **NPM host** (in the innotel setup the wildcard `*.innotel.us` record already
+   covers every subdomain, so there is nothing to add).
 
 3. **Up** (on the app host):
 

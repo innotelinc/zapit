@@ -17,7 +17,7 @@ services:
       AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
       AUTHENTIK_SCOPES: "${AUTHENTIK_SCOPES:-openid profile email}"
       # canonical public origin: QR codes + OIDC redirect URIs use this when set
-      # (e.g. https://zapit.innotel.us behind a reverse proxy)
+      # (e.g. https://zapp.innotel.us behind a reverse proxy)
       PUBLIC_URL: "${PUBLIC_URL:-}"
       # QR code customization: override the link address the QR code encodes
       # (defaults to the canonical/LAN URL)
