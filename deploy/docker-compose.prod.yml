@@ -8,15 +8,32 @@
 #   * zapp.innotel.us  -> <app-host>:5150 (ZapIt, WebSockets on)
 # NPM owns public ports 80/443 and TLS; these are internal app-host ports.
 #
+# The ZapIt app runs from the published image `ghcr.io/innotelinc/zapit`,
+# so releases deploy with a single `docker compose pull zapit` — the app
+# host does NOT need a repo checkout to update the app. Pin a specific
+# release with ZAPIT_TAG (e.g. `ZAPIT_TAG=1.4.1`); the default `latest`
+# follows the newest tagged release.
+#
+# The landing service still builds from this checkout (context
+# ../web/landing): no landing image is published to GHCR — the landing page
+# is static and is also deployed to GitHub Pages by the pages workflow. It
+# only needs a rebuild when you change the landing page itself.
+#
 # 1. On the APP host: copy .env.example to .env next to this file and set:
 #      ADMIN_PASSWORD=<secret>
+#      ZAPIT_TAG=<release>          (optional; defaults to latest)
 #      (Authentik vars only if you use SSO — see README)
 #
 # 2. DNS: both zapit.innotel.us and zapp.innotel.us must resolve to the NPM host.
 #    A wildcard *.innotel.us record already covers both in the innotel setup.
 #
-# 3. On the APP host, bring up both services:
+# 3. On the APP host, bring up both services (builds the landing page if its
+#    local image is missing, pulls the app image):
 #      docker compose -f docker-compose.prod.yml up -d
+#
+#    Later app releases — no checkout needed:
+#      docker compose -f docker-compose.prod.yml pull zapit
+#      docker compose -f docker-compose.prod.yml up -d zapit
 #
 # 4. On the NPM host (UI at http://<npm-host>:81) add two proxy hosts:
 #      Landing: Domain zapit.innotel.us, Scheme http, Forward Host <app-host LAN IP>, Port 8080
@@ -38,15 +55,13 @@ services:
     ports:
       - "8080:80"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/" ]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 30s
       timeout: 5s
       retries: 3
 
   zapit:
-    build:
-      context: ../zapit
-    image: zapit:local
+    image: ghcr.io/innotelinc/zapit:${ZAPIT_TAG:-latest}
     container_name: zapit
     restart: unless-stopped
     ports:

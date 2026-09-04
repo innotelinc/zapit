@@ -16,10 +16,20 @@ and TLS. The unified Docker Compose stack runs on the app host (e.g. the NAS at
 The boxes are not on a shared Docker network, so NPM forwards over the LAN by IP,
 not by container name.
 
+The **ZapIt app runs from the published image** `ghcr.io/innotelinc/zapit` (built by
+the `docker.yml` workflow on every release tag: `1.4.1`, `1.4`, `1`, and rolling
+`latest`). Deploying a release is a single `docker compose pull zapit` — the app
+host does **not** need a repo checkout to update the app. Pin a specific version
+with `ZAPIT_TAG` in `.env` for reproducible deploys.
+
+The **landing page still builds from this checkout** (static HTML; no landing image
+is published to GHCR — the `pages.yml` workflow also deploys it to GitHub Pages).
+It only needs a rebuild when the landing page itself changes.
+
 Files in this directory:
 
-- `docker-compose.prod.yml` — landing + ZapIt services
-- `.env.example` — environment template
+- `docker-compose.prod.yml` — landing + ZapIt services (app pulled from GHCR)
+- `.env.example` — environment template (`ZAPIT_TAG` pins the app release)
 - [`../web/landing/Dockerfile`](../web/landing/Dockerfile) — landing image definition
 - [`../zapit/authentik/blueprint.yaml`](../zapit/authentik/blueprint.yaml) — Authentik provider/application blueprint
 
@@ -28,6 +38,7 @@ Files in this directory:
 1. **App host env** — copy `.env.example` to `.env` next to `docker-compose.prod.yml`:
 
    ```bash
+   ZAPIT_TAG=latest                          # optional: pin a release, e.g. 1.4.1
    ADMIN_PASSWORD=<your-admin-secret>
    AUTHENTIK_BASE_URL=https://<your-authentik-host>   # only if you use SSO
    AUTHENTIK_CLIENT_ID=zapit
@@ -43,8 +54,16 @@ Files in this directory:
 3. **Up** (on the app host):
 
    ```bash
-   docker compose -f docker-compose.prod.yml up -d --build
-   docker compose -f docker-compose.prod.yml ps   # wait for (healthy)
+   docker compose -f docker-compose.prod.yml up -d    # pulls the app image; builds landing only if missing
+   docker compose -f docker-compose.prod.yml ps       # wait for (healthy)
+   ```
+
+   First deploy only: if the app image is not yet present locally, `up -d` pulls
+   it automatically. To force a fresh pull of the configured tag:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml pull zapit
+   docker compose -f docker-compose.prod.yml up -d zapit
    ```
 
    Verify both services from the NPM host:
@@ -100,9 +119,22 @@ When unset, the QR encodes `PUBLIC_URL` (or the LAN URL on plain local runs).
 
 ## Updates
 
+**App releases** (no repo checkout on the app host needed):
+
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml pull zapit   # grabs the newest tag / ZAPIT_TAG pin
+sudo docker compose -f docker-compose.prod.yml up -d zapit
 ```
 
-The production compose file builds both images from this repository, so changes to the
-landing page or app are included after `up -d --build`.
+- Default (`ZAPIT_TAG=latest`) tracks the newest tagged release on GHCR.
+- Set `ZAPIT_TAG=1.4.1` in `.env` to stay on a known-good release; bump it when
+  you're ready to move.
+- The container keeps its `zapit-data` volume, so admin state (kill-switch,
+  saved rooms are client-side) survives the swap.
+
+**Landing page** changes still need the checkout on the app host:
+
+```bash
+git pull   # on the app host checkout
+sudo docker compose -f docker-compose.prod.yml up -d --build landing
+```
