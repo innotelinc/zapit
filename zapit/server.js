@@ -43,7 +43,7 @@ const AUTHENTIK_BASE_URL = envStr(process.env.AUTHENTIK_BASE_URL); // e.g. https
 const AUTHENTIK_SLUG = envStr(process.env.AUTHENTIK_SLUG) || 'zapit';
 const AUTHENTIK_CLIENT_ID = envStr(process.env.AUTHENTIK_CLIENT_ID);
 const AUTHENTIK_SCOPES = envStr(process.env.AUTHENTIK_SCOPES) || 'openid profile email';
-// Canonical public origin (e.g. https://zapit.innotel.us). When set it overrides the
+// Canonical public origin (e.g. https://zapp.innotel.us). When set it overrides the
 // per-request Host for QR/LAN URLs, OIDC redirect URIs and blueprint generation.
 const PUBLIC_URL = envStr(process.env.PUBLIC_URL) ? envStr(process.env.PUBLIC_URL).replace(/\/+$/, '') : null;
 // QR code customization: QR_URL overrides the address the QR code encodes (and the
@@ -491,7 +491,7 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/authentik/blueprint' && req.method === 'GET') {
       if (!PUBLIC_URL) {
-        return send(res, 400, { error: 'PUBLIC_URL is not set — it defines the redirect URI origin (e.g. PUBLIC_URL=https://zapit.innotel.us)' });
+        return send(res, 400, { error: 'PUBLIC_URL is not set — it defines the redirect URI origin (e.g. PUBLIC_URL=https://zapp.innotel.us)' });
       }
       const slug = (state.oidc && state.oidc.slug) || AUTHENTIK_SLUG || 'zapit';
       const clientId = (state.oidc && state.oidc.clientId) || AUTHENTIK_CLIENT_ID || 'zapit';
