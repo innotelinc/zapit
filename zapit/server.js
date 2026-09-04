@@ -484,9 +484,17 @@ const server = http.createServer(async (req, res) => {
       const addrs = PUBLIC_URL ? [{ name: 'public', address: PUBLIC_URL, url: PUBLIC_URL }] : lanAddresses(PORT);
       // QR customization: QR_URL (env) overrides the encoded address; otherwise the
       // first LAN/public address (or self URL) is used.
-      const qrData = QR_URL || (addrs.length ? addrs[0].url : selfUrl);
+      let qrData = QR_URL || (addrs.length ? addrs[0].url : selfUrl);
+      // Optional ?room= bakes the room into the QR target so a scan opens the app
+      // already paired to that room (same sanitization as the WS join message).
+      const room = String(url.searchParams.get('room') || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 24);
+      if (room) {
+        const q = new URL(qrData);
+        q.searchParams.set('room', room);
+        qrData = q.toString();
+      }
       const qr = await QRCode.toDataURL(qrData, { margin: 1, width: 360, color: { dark: '#0b0d10', light: '#ffffff' } });
-      return send(res, 200, { selfUrl, addresses: addrs, qr, qrUrl: qrData, port: PORT });
+      return send(res, 200, { selfUrl, addresses: addrs, qr, qrUrl: qrData, room: room || null, port: PORT });
     }
 
     if (p === '/api/authentik/blueprint' && req.method === 'GET') {
