@@ -16,6 +16,7 @@ COPY --chown=node:node package.json package-lock.json* ./
 RUN npm ci --omit=dev --no-fund --no-audit && npm cache clean --force
 
 COPY --chown=node:node server.js ./
+COPY --chown=node:node infisical.js ./
 COPY --chown=node:node public ./public
 
 # persisted state lives here when a volume is mounted (see docker-compose.yml)
