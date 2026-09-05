@@ -31,7 +31,9 @@ the password, codes auto-expire, and everything vanishes when the tab closes. Op
 - **Relay fallback** through the server when NATs/UDP block direct paths
 - **Multi-file & folder drops arrive as one ZIP**, assembled in the browser (zero deps)
 - **Zings** — text snippets, links, code, anything — zapped alongside files
-- **Optional Authentik SSO** (OIDC + PKCE) with an admin kill-switch to flip login on/off
+- **Optional Authentik SSO** (OIDC + PKCE) with an admin kill-switch to flip login on/off —
+  pre-wired for the shared Cerulean Authentik (`zapit/zapit/.env`: base URL, public PKCE
+  client `zapit`, redirect `https://zapp.innotel.us/api/auth/callback`)
 - **Installable phone app (PWA)** — add ZapIt to an iPhone or Android home screen, with room-link sharing
 - **Customizable QR code** of your LAN address for one-scan phone pairing — point it at any
   link address with `QR_URL`
