@@ -70,7 +70,7 @@ Full documentation — Authentik setup, env vars, the admin panel, CI, and tests
 zapit is the ecosystem's **TransferOps** edge utility — ephemeral device-to-device transfer
 in the [**Innotel Platform Stack**](https://github.com/innotelinc/innotel-platform-stack) —
 the canonical single-responsibility architecture where Authentik owns identity, Infisical owns
-secrets, Cerulean owns trust, ONYX owns storage, Magnate owns revenue, and every other
+secrets, Cerulean owns trust, ONYX owns storage, Magnate owns revenue, NPM Edge owns the edge, and every other
 platform is a business function that consumes them. zapit explicitly does **not** own
 storage (ONYX), identity (Authentik), or billing (Magnate). See
 [docs/stack.md](docs/stack.md) for its owns/consumes boundaries and Infisical secret setup.
