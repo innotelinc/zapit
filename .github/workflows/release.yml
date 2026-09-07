@@ -63,7 +63,7 @@ jobs:
             --exclude='./.github' \
             --exclude='./.gitignore' \
             -czf "dist/$ARCHIVE" \
-            README.md LICENSE docker-compose.yml compose.infisical.yml \
+            README.md LICENSE compose.infisical.yml \
             docs scripts web zapit deploy .env.example
           (cd dist && sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256")
           ls -lh dist/
