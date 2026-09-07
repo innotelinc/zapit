@@ -6,7 +6,7 @@
 
 <img src="zapit/docs/logo.svg" alt="ZAPIT — golden lightning bolt" width="420" />
 
-[![CI](https://github.com/innotelinc/zapit/actions/workflows/docker.yml/badge.svg)](https://github.com/innotelinc/zapit/actions/workflows/docker.yml)
+[![CI](https://github.com/innotelinc/zapit/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/zapit/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/innotelinc/zapit)](https://github.com/innotelinc/zapit/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -23,6 +23,12 @@ transfer with no storage layer. Files never touch a server's disk: the room code
 the password, codes auto-expire, and everything vanishes when the tab closes. Open the
 [ZapIt app](https://zapp.innotel.us), or browse the
 [landing page](https://innotelinc.github.io/zapit/) for the full picture.
+
+| Problem | zapit answer |
+|---|---|
+| Sending a big file to someone on your LAN shouldn't upload it to a server | Device-to-device WebRTC transfer, relay fallback when NATs block direct paths |
+| File-sharing tools shouldn't keep your data or demand an account | Zero login by default — the room code is the password, nothing touches disk |
+| You want it gone after it's sent | Codes auto-expire; everything vanishes when the tab closes |
 
 ## ✨ Highlights
 

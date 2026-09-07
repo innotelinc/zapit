@@ -1,0 +1,38 @@
+name: CI
+
+# Runs the zapit test suite on every push/PR. Image publishing stays in
+# docker.yml (master pushes and v* tags); this workflow is the fast CI gate
+# shown in the README badge.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: zapit/package-lock.json
+
+      - name: Install dependencies
+        working-directory: zapit
+        run: npm ci --no-fund --no-audit
+
+      - name: Protocol suite (server API, relay, admin, kill-switch)
+        working-directory: zapit
+        run: node test/smoke.js
+
+      - name: Browser simulation (real UI, two jsdom tabs, p2p + zip)
+        working-directory: zapit
+        run: node test/browser-sim.js
