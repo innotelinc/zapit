@@ -1,0 +1,38 @@
+name: skill-checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'omniroute-provider/**'
+      - '.github/workflows/skill-checks.yml'
+  pull_request:
+    paths:
+      - 'omniroute-provider/**'
+      - '.github/workflows/skill-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  skill-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax-check all skill scripts
+        run: |
+          for f in omniroute-provider/scripts/*.sh; do
+            bash -n "$f"
+          done
+
+      - name: Run skill self-test (offline)
+        run: bash omniroute-provider/scripts/selftest.sh
+
+      - name: ShellCheck
+        run: |
+          # Non-blocking for now: report findings but don't fail the build.
+          shellcheck -x omniroute-provider/scripts/*.sh || \
+            echo "::warning::shellcheck reported issues (non-blocking)"
