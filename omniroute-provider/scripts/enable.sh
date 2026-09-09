@@ -28,7 +28,10 @@ fi
 BASE_URL="$OMNIROUTE_BASE_URL"
 AUTH_TOKEN="${OMNIROUTE_AUTH_TOKEN:-local}"
 MODEL="${OMNIROUTE_MODEL:-}"
-CONTEXT_TOKENS="${OMNIROUTE_CONTEXT_TOKENS:-1048576}"
+# NOTE: no colon in the default expansion - set-but-empty must stay empty
+# (empty = don't write CLAUDE_CODE_MAX_CONTEXT_TOKENS), only unset takes
+# the default.
+CONTEXT_TOKENS="${OMNIROUTE_CONTEXT_TOKENS-1048576}"
 
 mkdir -p "$(dirname "$SETTINGS_FILE")"
 
