@@ -53,6 +53,12 @@ check on the OmniRoute side.
   falls back to the standard Anthropic API. Leaves every other setting in
   the file untouched.
 
+- `scripts/selftest.sh` — offline self-test for the other three scripts
+  (asserts the enable → status → disable round-trip on a throwaway
+  settings file). CI runs this on every change to the skill; run it
+  locally with `bash scripts/selftest.sh` before editing, add `--online`
+  to also probe a live gateway.
+
 - `scripts/status.sh` — prints what's currently configured, including the
   pinned model and context-window setting. For the
   reachability check it uses, in order: `OMNIROUTE_BASE_URL` if set, else
