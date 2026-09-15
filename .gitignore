@@ -10,3 +10,8 @@ go1.*.tar.gz*
 
 # unrelated local project — remove this line to track it
 compose/
+
+# Cerulean Vault token copies (data/vault/token/<product>.token) — live credentials.
+data/vault/token/
+data/vault/init/
+data/vault/file/

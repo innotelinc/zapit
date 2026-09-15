@@ -43,27 +43,31 @@ const AUTHENTIK_BASE_URL = envStr(process.env.AUTHENTIK_BASE_URL); // e.g. https
 const AUTHENTIK_SLUG = envStr(process.env.AUTHENTIK_SLUG) || 'zapit';
 const AUTHENTIK_CLIENT_ID = envStr(process.env.AUTHENTIK_CLIENT_ID);
 const AUTHENTIK_SCOPES = envStr(process.env.AUTHENTIK_SCOPES) || 'openid profile email';
+// Who may reach the /admin panel through Cerulean Authentik. Authentik delivers
+// group membership as a claim, and membership here is what turns an SSO session
+// into an admin one. The bearer password (ADMIN_PASSWORD) stays as break-glass,
+// for when Authentik itself is the thing that is broken.
+const ZAPIT_ADMIN_GROUPS = envStr(process.env.ZAPIT_ADMIN_GROUPS) || 'cerulean-platform';
+const ADMIN_GROUPS = ZAPIT_ADMIN_GROUPS.split(',').map((s) => s.trim()).filter(Boolean);
 // Canonical public origin (e.g. https://zapp.innotel.us). When set it overrides the
 // per-request Host for QR/LAN URLs, OIDC redirect URIs and blueprint generation.
 const PUBLIC_URL = envStr(process.env.PUBLIC_URL) ? envStr(process.env.PUBLIC_URL).replace(/\/+$/, '') : null;
 // QR code customization: QR_URL overrides the address the QR code encodes (and the
 // caption link) without touching LAN/PUBLIC_URL behavior. Defaults to the LAN/self URL.
 const QR_URL = envStr(process.env.QR_URL) || null;
-/* -------- SecretOps (Infisical) -----------------------------------------
- * ADMIN_PASSWORD / AUTHENTIK_CLIENT_SECRET may be `infisical://<name>`
- * references (docs/stack.md). Resolution is synchronous (boot-time, via a
- * child node process) so the admin-password hash below is computed from the
- * resolved value; plain values are mirrored into Infisical on boot so .env
- * can switch to references after the first run.
+/* -------- SecretOps (Cerulean Vault) ------------------------------------
+ * ADMIN_PASSWORD / AUTHENTIK_CLIENT_SECRET may be
+ * `vault://<mount>/<path>#<key>` references (docs/stack.md). Resolution is
+ * synchronous (boot-time, in a child node process) so the admin-password hash
+ * below is computed from the resolved value. Plain values pass through
+ * untouched; a reference that cannot be resolved refuses to boot rather than
+ * starting with a literal reference where a credential belongs.
  */
-const infisical = require('./infisical');
-const infisicalCfg = infisical.configFromEnv();
-const ADMIN_PASSWORD = infisicalCfg.enabled
-  ? infisical.resolveRefSync(infisicalCfg, envStr(process.env.ADMIN_PASSWORD))
-  : envStr(process.env.ADMIN_PASSWORD);
-const AUTHENTIK_CLIENT_SECRET = infisicalCfg.enabled
-  ? infisical.resolveRefSync(infisicalCfg, envStr(process.env.AUTHENTIK_CLIENT_SECRET) || '')
-  : envStr(process.env.AUTHENTIK_CLIENT_SECRET) || '';
+const vault = require('./vault');
+const vaultCfg = vault.configFromEnv();
+const ADMIN_PASSWORD = vault.resolveRefSync(vaultCfg, envStr(process.env.ADMIN_PASSWORD));
+const AUTHENTIK_CLIENT_SECRET =
+  vault.resolveRefSync(vaultCfg, envStr(process.env.AUTHENTIK_CLIENT_SECRET) || '') || '';
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 h
 const COOKIE_NAME = 'zapit_sid';
@@ -149,11 +153,32 @@ function parseCookies(req) {
   return out;
 }
 
-const sessions = new Map(); // sid -> { email, name, exp }
+const sessions = new Map(); // sid -> { email, name, groups, exp }
+
+/**
+ * Normalize an Authentik `groups` claim to a list.
+ *
+ * Authentik sends a JSON array from the `profile` scope mapping and a
+ * space-delimited string from its dedicated `groups` mapping, so both shapes are
+ * accepted rather than assuming one.
+ */
+function normalizeGroups(value) {
+  if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
+  if (typeof value === 'string') return value.split(/[\s,]+/).map((v) => v.trim()).filter(Boolean);
+  return [];
+}
 
 function createSession(userinfo) {
   const sid = randomId(32);
-  sessions.set(sid, { email: userinfo.email || userinfo.preferred_username || 'user', name: userinfo.name || userinfo.given_name || userinfo.email || 'user', exp: Date.now() + SESSION_TTL_MS });
+  sessions.set(sid, {
+    email: userinfo.email || userinfo.preferred_username || 'user',
+    name: userinfo.name || userinfo.given_name || userinfo.email || 'user',
+    // Carried in the session so the admin gate can re-check membership on every
+    // request. None of this is a password: an SSO session that is not in an
+    // admin group authenticates but is not authorized.
+    groups: normalizeGroups(userinfo.groups),
+    exp: Date.now() + SESSION_TTL_MS,
+  });
   return sid;
 }
 
@@ -335,11 +360,41 @@ entries:
 
 /* ------------------------------------------------------------ admin auth */
 
+/**
+ * The admin session for this request, when it is a Cerulean Authentik one.
+ *
+ * Returns null when there is no session, when the session carries no group
+ * claim, or when none of its groups is an allowed admin group — so "authenticated"
+ * alone is never enough to reach the panel.
+ */
+function adminSession(req) {
+  const session = getSession(req);
+  if (!session) return null;
+  if (ADMIN_GROUPS.length === 0) return null;
+  const groups = Array.isArray(session.groups) ? session.groups : [];
+  return groups.some((g) => ADMIN_GROUPS.includes(g)) ? session : null;
+}
+
+/**
+ * Authorize an admin API call. Returns the method used ('sso' | 'password') or
+ * null after writing the response.
+ *
+ * Cerulean Authentik is the primary identity, so an SSO session in an admin
+ * group is checked first. The bearer password remains as break-glass — the one
+ * way back in when Authentik cannot issue a session at all.
+ */
 function requireAdmin(req, res) {
+  if (adminSession(req)) return 'sso';
+
   const auth = req.headers.authorization || '';
   const m = /^Bearer\s+(.+)$/i.exec(auth);
   if (!m) {
-    send(res, 401, { error: 'admin token required' }, { 'WWW-Authenticate': 'Bearer realm="zapit-admin"' });
+    send(
+      res,
+      401,
+      { error: 'admin authentication required (sign in with Cerulean, or send a Bearer admin password)' },
+      { 'WWW-Authenticate': 'Bearer realm="zapit-admin"' },
+    );
     return null;
   }
   if (!state.adminPasswordHash) {
@@ -350,7 +405,7 @@ function requireAdmin(req, res) {
     send(res, 403, { error: 'invalid admin password' });
     return null;
   }
-  return true;
+  return 'password';
 }
 
 /* ------------------------------------------------------------ HTTP router */
@@ -370,6 +425,9 @@ const server = http.createServer(async (req, res) => {
         oidcConfigured: !!state.oidc,
         authenticated: !!sess,
         user: sess ? { email: sess.email, name: sess.name } : null,
+        // Whether this session may reach /admin through Authentik alone.
+        adminViaSso: !!adminSession(req),
+        adminGroupsConfigured: ADMIN_GROUPS.length > 0,
       });
     }
 
@@ -445,9 +503,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/admin/state' && req.method === 'GET') {
-      if (!requireAdmin(req, res)) return;
+      const via = requireAdmin(req, res);
+      if (!via) return;
       return send(res, 200, {
         authEnabled: state.authEnabled,
+        adminVia: via,
+        adminGroups: ADMIN_GROUPS,
         oidc: state.oidc
           ? { baseUrl: state.oidc.baseUrl, slug: state.oidc.slug, clientId: state.oidc.clientId, hasSecret: !!state.oidc.clientSecret }
           : null,
@@ -685,16 +746,9 @@ server.on('upgrade', (req, socket, head) => {
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
 });
 
-// Mirror plain secret values into Infisical (best-effort, after listen).
-if (infisicalCfg.enabled) {
-  infisical
-    .mirror(infisicalCfg, { ADMIN_PASSWORD, AUTHENTIK_CLIENT_SECRET })
-    .then(({ written, errs }) => {
-      if (written.length) console.log(`         ▸  mirrored into Infisical: ${written.join(', ')}`);
-      for (const e of errs) console.error(`         ▸  infisical mirror failed: ${e.message}`);
-    })
-    .catch(() => {});
-}
+// Nothing is written back to the store: Cerulean mints this stack's token with
+// a read/list policy, so pushing plain values into Cerulean Vault is an
+// operator step — `python3 scripts/vault-migrate.py --from-env-file .env`.
 
 server.listen(PORT, HOST, () => {
   const shown = HOST === '0.0.0.0' ? '0.0.0.0 (all interfaces)' : HOST;
