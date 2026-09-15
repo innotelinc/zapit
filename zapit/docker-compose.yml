@@ -24,12 +24,14 @@ services:
       QR_URL: "${QR_URL:-}"
       AUTH_ENABLED: "${AUTH_ENABLED:-false}"
       # SecretOps (docs/stack.md): ADMIN_PASSWORD / AUTHENTIK_CLIENT_SECRET
-      # may be infisical://<name> references resolved at startup; plain
-      # values are mirrored into Infisical on boot.
-      INFISICAL_ADDR: "${INFISICAL_ADDR:-}"
-      INFISICAL_TOKEN: "${INFISICAL_TOKEN:-}"
-      INFISICAL_WORKSPACE_ID: "${INFISICAL_WORKSPACE_ID:-}"
-      INFISICAL_ENVIRONMENT: "${INFISICAL_ENVIRONMENT:-prod}"
+      # may be vault://<mount>/<path>#<key> references resolved at startup.
+      VAULT_ADDR: "${VAULT_ADDR:-}"
+      VAULT_TOKEN: "${VAULT_TOKEN:-}"
+      VAULT_TOKEN_FILE: "${VAULT_TOKEN_FILE:-}"
+      VAULT_PREFIX: "${VAULT_PREFIX:-cerulean}"
+      VAULT_NAMESPACE: "${VAULT_NAMESPACE:-}"
+      VAULT_SKIP_VERIFY: "${VAULT_SKIP_VERIFY:-}"
+      VAULT_CACERT: "${VAULT_CACERT:-}"
     volumes:
       # named volume: owned by the container's node user automatically.
       # Prefer a bind mount instead? Use ./data:/data and run: chown 1000:1000 ./data
