@@ -2,21 +2,20 @@
 # zapit — one-shot setup: hooks, env, and quick start.
 #
 #   ./scripts/setup.sh            # hooks + .env bootstrap + instructions
-#   ./scripts/setup.sh --infisical  # also bootstrap Infisical (SecretOps)
 #   ./scripts/setup.sh --help
 #
-# Idempotent: safe to re-run.
+# Idempotent: safe to re-run. There is no local secret service to bootstrap:
+# Cerulean Vault is hosted by the platform, and plain values move into it with
+# scripts/vault-migrate.py (see docs/stack.md).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-WITH_INFISICAL=0
 for arg in "$@"; do
   case "$arg" in
-    --infisical) WITH_INFISICAL=1 ;;
     --help|-h)
-      sed -n '2,6p' "$0"
+      sed -n '2,7p' "$0"
       exit 0
       ;;
     *) echo "unknown option: $arg (see ./scripts/setup.sh --help)" >&2; exit 1 ;;
@@ -32,15 +31,16 @@ if [ -d "$ROOT/.githooks" ] && git rev-parse --is-inside-work-tree >/dev/null 2>
   log "commit guard hook enabled (core.hooksPath -> .githooks)"
 fi
 
-# Root env carries the Infisical (SecretOps) contract; the app env lives at
-# zapit/.env (copied from zapit/.env.example by the app's own workflow).
+# Root env carries the Cerulean Vault (SecretOps) contract; the app env lives
+# at zapit/.env (copied from zapit/.env.example by the app's own workflow).
 if [ ! -f .env ]; then
   cp .env.example .env
   cat <<'EOF'
 
 Created .env from .env.example.
-  * Edit .env and fill in the INFISICAL_* keys if you plan to enable
-    SecretOps, then re-run ./scripts/setup.sh --infisical.
+  * To resolve the app's ADMIN_PASSWORD / AUTHENTIK_CLIENT_SECRET from Cerulean
+    Vault, set VAULT_ADDR plus VAULT_TOKEN (or VAULT_TOKEN_FILE) in .env and use
+    vault://<mount>/<path>#<key> values; otherwise leave plain values in place.
   * App config (PORT, ADMIN_PASSWORD, Authentik SSO) lives in zapit/.env —
     copy zapit/.env.example to zapit/.env and edit it.
 EOF
@@ -50,11 +50,6 @@ fi
 if [ ! -f zapit/.env ]; then
   cp zapit/.env.example zapit/.env
   log "created zapit/.env from zapit/.env.example — edit ADMIN_PASSWORD, Authentik SSO"
-fi
-
-if [ "$WITH_INFISICAL" = 1 ]; then
-  log "bootstrapping Infisical (SecretOps)..."
-  bash scripts/infisical-setup.sh
 fi
 
 log "quick start (npm):  cd zapit && npm install && ADMIN_PASSWORD=... npm start"

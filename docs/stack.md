@@ -35,7 +35,7 @@ provides, and explicitly does not own.
 
 - **Storage** (ONYX) — files are ephemeral; nothing is persisted server-side
 - Identity (Authentik)
-- Secrets (Infisical)
+- Secrets (Cerulean Vault)
 - Billing / revenue (Magnate)
 - Certificates / trust (Cerulean)
 
@@ -43,36 +43,44 @@ provides, and explicitly does not own.
 > layer. It sits alongside the business platforms but stays deliberately small:
 > one Node process, two runtime dependencies, ~zero config.
 
-## Secrets (Infisical)
+## Secrets (Cerulean Vault)
 
-Secrets for this platform live in **Infisical** (SecretOps): the admin password and
-Authentik credentials are imported into an Infisical workspace and the stack's `.env`
-is derived from it. Enable it with:
+The platform's SecretOps is **Cerulean Vault** — HashiCorp Vault, KV v2, hosted by
+Cerulean — with `vault://<mount>/<path>#<key>` references in `.env`:
 
 ```bash
-# generate the required keys and add them to .env
-openssl rand -base64 32   # INFISICAL_ENCRYPTION_KEY
-openssl rand -hex 16      # INFISICAL_AUTH_SECRET
-openssl rand -hex 16      # INFISICAL_DB_PASSWORD
-
-# start the profile and provision the workspace + import .env secrets
-docker compose -f zapit/docker-compose.yml -f compose.infisical.yml --profile infisical up -d
-bash scripts/infisical-setup.sh
+ADMIN_PASSWORD=vault://cerulean/zapit#ADMIN_PASSWORD
 ```
 
-See [compose.infisical.yml](../compose.infisical.yml) and
-[scripts/infisical-setup.py](../scripts/infisical-setup.py) for details.
+Cerulean mints this stack's **path-scoped** token (its policy covers only
+`cerulean/data/zapit`, never a sibling's secrets) and renews it in place. Copy it
+to `./data/vault/token/zapit.token`, then move any plaintext values across:
 
-### Runtime resolution (`infisical://`)
+```bash
+VAULT_ADDR=http://<cerulean-host>:8200 \
+  VAULT_TOKEN_FILE=./data/vault/token/zapit.token \
+  VAULT_PREFIX=cerulean VAULT_PATH=zapit \
+  python3 scripts/vault-migrate.py --from-env-file .env \
+    --keys ADMIN_PASSWORD,AUTHENTIK_CLIENT_SECRET
+```
 
-With `INFISICAL_ADDR` / `INFISICAL_TOKEN` / `INFISICAL_WORKSPACE_ID` in `.env` (written
-back by `scripts/infisical-setup.py`), the server resolves secrets at startup:
+### Runtime resolution (`vault://`)
 
-- `ADMIN_PASSWORD` and `AUTHENTIK_CLIENT_SECRET` may be `infisical://<name>`
-  references — resolved synchronously at boot, before the admin hash is computed.
-- Plain values are **mirrored into Infisical on boot** (best-effort), so after one
-  boot you can switch `.env` to references.
+With `VAULT_ADDR` and `VAULT_TOKEN` (or `VAULT_TOKEN_FILE`) in `.env`, the server
+resolves secrets at startup:
 
-Client: `zapit/infisical.js` (zero-dependency, same contract as Cerulean/Onyx).
+- `ADMIN_PASSWORD` and `AUTHENTIK_CLIENT_SECRET` may be `vault://<mount>/<path>#<key>`
+  references — resolved synchronously at boot, before the admin hash is computed,
+  in a child node process so the blocking read cannot stall the server's loop.
+- A reference that cannot be resolved — unconfigured, unreachable, a missing key,
+  an empty value — **fails the boot** rather than starting with a literal
+  reference where a credential belongs. Plain values pass through untouched.
+- A leftover `infisical://` value is refused outright: Infisical is retired here,
+  not a fallback.
+
+Client: `zapit/vault.js` (zero-dependency, same contract as Cerulean/Onyx/Zeus).
+It is **read-only**: Cerulean grants this stack a read/list policy, so pushing
+plain values into Vault is the operator's `scripts/vault-migrate.py`, not a
+boot-time mirror.
 
 *zapit · TransferOps · [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack)*

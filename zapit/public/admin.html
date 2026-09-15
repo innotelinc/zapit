@@ -125,12 +125,13 @@
   <!-- login -->
   <div id="login">
     <h1><svg class="bolt" viewBox="0 0 48 64" aria-hidden="true"><defs><linearGradient id="boltGradA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffbeb"/><stop offset=".3" stop-color="#fcd34d"/><stop offset=".55" stop-color="#f59e0b"/><stop offset=".8" stop-color="#d97706"/><stop offset="1" stop-color="#92400e"/></linearGradient><filter id="boltGlowA" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path class="bolt-body" filter="url(#boltGlowA)" fill="url(#boltGradA)" d="M32 2 L4 40 H17 L12 62 L44 24 H29 Z"/><path class="spark s1" d="M7 6 l3 5 -2.5 1 3 5" stroke="#fcd34d" stroke-width="1.6" fill="none" stroke-linecap="round"/><path class="spark s2" d="M42 8 l-3 5 2.5 1 -3 5" stroke="#f59e0b" stroke-width="1.4" fill="none" stroke-linecap="round"/><path class="spark s3" d="M43 42 l-3 4 2.5 1.5 -3 4" stroke="#d97706" stroke-width="1.6" fill="none" stroke-linecap="round"/><path class="spark s4" d="M4 48 l3 4 -2.5 1.5 3 4" stroke="#fef3c7" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>zapit admin</h1>
-    <div class="sub">Enter the admin password to manage the auth switch.</div>
-    <label for="pw">Admin password</label>
+    <div class="sub">Sign in with Cerulean to manage the auth switch.</div>
+    <button id="ssoBtn" class="ghostBtn" style="width:100%;margin-bottom:14px">Sign in with Cerulean</button>
+    <label for="pw">Admin password (break-glass)</label>
     <input id="pw" type="password" placeholder="••••••••" autocomplete="current-password" />
     <button id="loginBtn">Unlock</button>
     <div id="loginMsg" class="msg"></div>
-    <div class="sub" style="margin-top:18px">Set it via the <b>ADMIN_PASSWORD</b> env var (or <b>zapit/data/config.json</b> → <b>adminPasswordHash</b>).</div>
+    <div class="sub" style="margin-top:18px">SSO admits members of the <b>ZAPIT_ADMIN_GROUPS</b> group (default <b>cerulean-platform</b>). The password is a fallback, set via <b>ADMIN_PASSWORD</b> (or <b>zapit/data/config.json</b> → <b>adminPasswordHash</b>).</div>
   </div>
 
   <!-- panel -->
@@ -178,8 +179,18 @@
   'use strict';
   const $ = (id) => document.getElementById(id);
   let token = sessionStorage.getItem('zapit_admin') || '';
+  // True once the panel was opened by a Cerulean Authentik session rather than
+  // the password: locking then has to end the SSO session too.
+  let viaSso = false;
 
-  const authHeaders = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` });
+  // The Bearer header is sent only when a password token exists. A Cerulean
+  // session travels as the browser cookie instead, and sending an empty
+  // `Bearer ` would be rejected as a malformed credential.
+  const authHeaders = () => {
+    const h = { 'Content-Type': 'application/json' };
+    if (token) h.Authorization = `Bearer ${token}`;
+    return h;
+  };
 
   async function login() {
     const pw = $('pw').value;
@@ -204,14 +215,20 @@
   }
 
   async function showPanel() {
-    const r = await fetch('/api/admin/state', { headers: authHeaders() });
+    const r = await fetch('/api/admin/state', { headers: authHeaders(), credentials: 'same-origin' });
     if (r.status === 401 || r.status === 403 || r.status === 409) {
+      viaSso = false;
       token = ''; sessionStorage.removeItem('zapit_admin');
       $('panel').classList.add('hidden'); $('login').classList.remove('hidden');
-      if (r.status === 409) { $('loginMsg').textContent = (await r.json()).error; }
+      if (r.status === 403) {
+        $('loginMsg').textContent = 'Signed in, but this account is not in an admin group — ask an administrator to add you to ZAPIT_ADMIN_GROUPS.';
+        $('loginMsg').className = 'msg err';
+      }
+      if (r.status === 409) { $('loginMsg').textContent = (await r.json()).error; $('loginMsg').className = 'msg err'; }
       return;
     }
     const s = await r.json();
+    viaSso = s.adminVia === 'sso';
     $('login').classList.add('hidden');
     $('panel').classList.remove('hidden');
     $('authSwitch').checked = s.authEnabled;
@@ -251,7 +268,16 @@
 
   $('loginBtn').onclick = login;
   $('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
-  $('logoutBtn').onclick = () => { token = ''; sessionStorage.removeItem('zapit_admin'); $('panel').classList.add('hidden'); $('login').classList.remove('hidden'); };
+  // Authentik PKCE start; `next=/admin` returns here once the session is set.
+  $('ssoBtn').onclick = () => { window.location.href = '/api/auth/start?next=/admin'; };
+  $('logoutBtn').onclick = async () => {
+    token = ''; sessionStorage.removeItem('zapit_admin');
+    if (viaSso) {
+      viaSso = false;
+      try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch { /* best effort */ }
+    }
+    $('panel').classList.add('hidden'); $('login').classList.remove('hidden');
+  };
 
   // authentik blueprint: download / copy
   async function blueprintText() {
@@ -277,7 +303,10 @@
     } catch (e) { $('panelMsg').textContent = e.message; $('panelMsg').className = 'msg err'; }
   };
 
-  if (token) showPanel();
+  // Always probe: a Cerulean Authentik session authorizes the panel with no
+  // stored token at all, and an unauthenticated visitor simply lands on the
+  // login form when the probe answers 401.
+  showPanel();
 })();
 </script>
 </body>
