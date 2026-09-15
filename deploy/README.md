@@ -6,7 +6,7 @@ Public domains:
 - Transfer app: `https://zapp.innotel.us`
 
 Reverse proxy: **Nginx Proxy Manager (NPM)**, running on its **own host** (e.g.
-`192.168.1.71`, admin UI at `http://192.168.1.71:81`). NPM owns public ports 80/443
+`192.168.1.46`, admin UI at `http://192.168.1.46:81`). NPM owns public ports 80/443
 and TLS. The unified Docker Compose stack runs on the app host (e.g. the NAS at
 `192.168.1.10`) and publishes two internal ports on that host:
 
