@@ -7,7 +7,7 @@
 #   bash enable.sh .claude/settings.json  # edits a project-local settings file
 #
 # Env overrides (skip the matching prompt if set):
-#   OMNIROUTE_BASE_URL   e.g. http://192.168.1.46:20128/v1
+#   OMNIROUTE_BASE_URL   e.g. http://192.168.1.71:20128/v1
 #   OMNIROUTE_AUTH_TOKEN (default: local)
 #   OMNIROUTE_MODEL      (default: unset -> Claude Code's own default model name)
 #   OMNIROUTE_CONTEXT_TOKENS (default: 1048576 when OMNIROUTE_MODEL is set)
@@ -18,7 +18,7 @@ SETTINGS_FILE="${1:-$HOME/.claude/settings.json}"
 
 if [ -z "${OMNIROUTE_BASE_URL:-}" ]; then
     if [ -t 0 ]; then
-        read -r -p "OmniRoute base URL (e.g. http://192.168.1.46:20128/v1): " OMNIROUTE_BASE_URL
+        read -r -p "OmniRoute base URL (e.g. http://192.168.1.71:20128/v1): " OMNIROUTE_BASE_URL
     fi
     if [ -z "${OMNIROUTE_BASE_URL:-}" ]; then
         echo "Error: no OmniRoute base URL given. Pass one via OMNIROUTE_BASE_URL=... or answer the prompt." >&2
