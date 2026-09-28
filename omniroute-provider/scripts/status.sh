@@ -44,7 +44,7 @@ fi
 
 BASE_URL="${OMNIROUTE_BASE_URL:-$CONFIGURED_BASE_URL}"
 if [ -z "$BASE_URL" ] && [ -t 0 ]; then
-    read -r -p "OmniRoute base URL to check (e.g. http://192.168.1.46:20128/v1): " BASE_URL
+    read -r -p "OmniRoute base URL to check (e.g. http://192.168.1.71:20128/v1): " BASE_URL
 fi
 if [ -z "$BASE_URL" ]; then
     echo

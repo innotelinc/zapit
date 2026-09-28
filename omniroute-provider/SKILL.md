@@ -31,7 +31,7 @@ check on the OmniRoute side.
   `.claude/settings.json`, see Scope below), then sets:
   - `ANTHROPIC_BASE_URL` → OmniRoute's URL. **Not hardcoded** — if
     `OMNIROUTE_BASE_URL` isn't set in the environment, the script prompts
-    for it interactively (e.g. `http://192.168.1.46:20128/v1`). If you're
+    for it interactively (e.g. `http://192.168.1.71:20128/v1`). If you're
     running this on the user's behalf non-interactively, ask the user for
     their OmniRoute host/port first and pass it as `OMNIROUTE_BASE_URL`.
   - `ANTHROPIC_AUTH_TOKEN` → a token/key, if OmniRoute requires one
@@ -78,7 +78,7 @@ bash scripts/enable.sh
 **Turn it on non-interactively (e.g. scripted by Claude Code itself),
 by supplying the host up front:**
 ```bash
-OMNIROUTE_BASE_URL="http://192.168.1.46:20128/v1" bash scripts/enable.sh
+OMNIROUTE_BASE_URL="http://192.168.1.71:20128/v1" bash scripts/enable.sh
 ```
 
 **Turn it on for just the current project** (so other projects keep
@@ -126,7 +126,7 @@ gateways that don't check it.
 ## Gateway gotchas learned the hard way
 
 - **Base URL shape:** OmniRoute expects the base URL to *include* `/v1`
-  (e.g. `http://192.168.1.46:20128/v1`); Claude Code then appends
+  (e.g. `http://192.168.1.71:20128/v1`); Claude Code then appends
   `/v1/messages` itself, and the gateway resolves the resulting doubled
   `/v1/v1/messages` path internally. `POST {host}/v1/v1/messages`
   returning 200 is the quickest curl probe that a base URL is correct.
