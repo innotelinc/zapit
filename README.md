@@ -10,6 +10,7 @@
 [![Conformity](https://github.com/innotelinc/zapit/actions/workflows/conform.yml/badge.svg)](https://github.com/innotelinc/zapit/actions/workflows/conform.yml)
 [![Latest release](https://img.shields.io/github/v/release/innotelinc/zapit)](https://github.com/innotelinc/zapit/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Theme: Unity](https://img.shields.io/badge/theme-Unity-6366f1)](https://github.com/innotelinc/innotel-platform-stack/blob/main/standards/unity/README.md)
 
 Open the same URL on two devices (or scan the QR), type the same room code, and drop
 files. They stream **device-to-device over WebRTC** when possible, with an automatic
