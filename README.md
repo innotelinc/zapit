@@ -16,15 +16,17 @@ Open the same URL on two devices (or scan the QR), type the same room code, and 
 files. They stream **device-to-device over WebRTC** when possible, with an automatic
 **server-relay fallback**, so it works on your LAN and across the internet.
 
+> **zapit** is the ecosystem's **TransferOps** edge utility: ephemeral,
+> device-to-device file transfer with no storage layer. Files stream over WebRTC
+> with an automatic server-relay fallback; the room code is the password, codes
+> expire, and nothing is written to the server's disk. It consumes Authentik for
+> optional SSO and Cerulean Vault for secrets, and owns no storage, identity or
+> billing of its own. Landing page:
+> [innotelinc.github.io/zapit](https://innotelinc.github.io/zapit/).
+
 </div>
 
-## About
-
-zapit is the ecosystem's **TransferOps** edge utility — ephemeral, peer-to-peer file
-transfer with no storage layer. Files never touch a server's disk: the room code is
-the password, codes auto-expire, and everything vanishes when the tab closes. Open the
-[ZapIt app](https://zapp.innotel.us), or browse the
-[landing page](https://innotelinc.github.io/zapit/) for the full picture.
+## Why zapit
 
 | Problem | zapit answer |
 |---|---|
@@ -45,9 +47,12 @@ the password, codes auto-expire, and everything vanishes when the tab closes. Op
 - **Installable phone app (PWA)** — add ZapIt to an iPhone or Android home screen, with room-link sharing
 - **Customizable QR code** of your LAN address for one-scan phone pairing — point it at any
   link address with `QR_URL`
-- Single Node process, two runtime dependencies, ~zero config
+- Single Node process, three runtime dependencies, ~zero config
 - **Docker-ready** — non-root image, healthcheck, multi-arch builds published to GHCR by CI
   (tests gate every build: protocol suite + a browser simulation driving the real UI)
+- **Cerulean Vault secrets** — `ADMIN_PASSWORD` and the OIDC secret may be
+  `vault://` references resolved at boot; an unresolvable reference fails the
+  boot rather than starting with a literal credential path
 - **One-click Authentik blueprint** — zapit generates the provider YAML for you at
   `/api/authentik/blueprint`, or mount the static one in `zapit/authentik/blueprint.yaml`
 
@@ -99,7 +104,7 @@ from your phone and start zapping.
 zapit/                         The app: server, UI, Dockerfile, tests, docs
 ```
 
-## About
+## Author
 
 **Darnel Hunter** — [dhunter@innotel.us](mailto:dhunter@innotel.us)
 
